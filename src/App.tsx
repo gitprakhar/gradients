@@ -102,11 +102,8 @@ export function App() {
     // Only create new stop if plus cursor is showing
     if (!showPlusCursor) return
     
-    // Prevent creating new stop if we just finished dragging
-    if (hasDraggedRef.current) {
-      hasDraggedRef.current = false
-      return
-    }
+    // Prevent creating new stop if we just finished dragging (hasDraggedRef is cleared in drag’s mouseup)
+    if (hasDraggedRef.current) return
     
     const rect = pageRef.current.getBoundingClientRect()
     const y = e.clientY - rect.top
@@ -154,10 +151,6 @@ export function App() {
     setDragging(index)
   }
 
-  const handleCircleClick = (index: number) => (e: React.MouseEvent) => {
-    e.stopPropagation()
-    colorInputRefs.current[index]?.click()
-  }
 
   const handleRemoveStop = (index: number) => (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -249,6 +242,7 @@ export function App() {
 
     const handleMouseUp = () => {
       setDragging(null)
+      hasDraggedRef.current = false
     }
 
     if (dragging !== null) {
@@ -432,12 +426,16 @@ export function App() {
                 <div 
                   className="flex items-center gap-1.5 bg-white/80 backdrop-blur-xl px-2 py-1 shadow cursor-grab active:cursor-grabbing"
                   onMouseDown={handleCircleMouseDown(index)}
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  {/* Color square */}
+                  {/* Color square — open picker on mousedown; parent onClick stops click from creating a new stop */}
                   <div 
                     className="w-4 h-4 cursor-pointer"
                     style={{ background: stop.color }}
-                    onClick={handleCircleClick(index)}
+                    onMouseDown={(e) => {
+                      e.stopPropagation()
+                      colorInputRefs.current[index]?.click()
+                    }}
                   />
                   
                   {/* Hex code */}
@@ -461,7 +459,9 @@ export function App() {
                   type="color" 
                   value={stop.color}
                   onChange={(e) => handleColorChange(index, e.target.value)}
-                  className="hidden"
+                  onClick={(e) => e.stopPropagation()}
+                  className="absolute opacity-0 w-0 h-0 p-0 m-0 border-0"
+                  style={{ clip: 'rect(0,0,0,0)' }}
                 />
               </div>
             )
