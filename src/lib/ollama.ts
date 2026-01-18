@@ -1,31 +1,34 @@
 import { OLLAMA_CONFIG } from '@/config/ollama'
 
-export interface GradientColors {
-  colors: string[] // Array of hex color codes
+export interface GradientStop {
+  color: string
+  stop: number
 }
 
 /**
- * Calls Ollama API to generate a gradient based on a text prompt
- * Returns an array of hex color codes for the gradient
+ * Calls Ollama API to generate a gradient based on a text prompt.
+ * Returns an array of { color, stop } where stop is 0–100 (percentage along the gradient).
  */
-export async function generateGradientFromPrompt(prompt: string): Promise<string[]> {
-  // Note: Local Ollama doesn't require an API key - it's optional for hosted instances
-  const systemPrompt = `You are a gradient color generator that creates realistic, visually accurate gradients.
+export async function generateGradientFromPrompt(prompt: string): Promise<GradientStop[]> {
+  const systemPrompt = `You are a gradient color generator. Create beautiful, well-balanced gradients based on user descriptions.
 
-Important rules:
-- Generate 2-4 hex colors that blend smoothly together
-- Use colors that match the ACTUAL visual appearance (e.g., "night sky" should be very dark blues/purples, not bright blue)
-- Consider real-world lighting and color temperature
-- Adjacent colors should be similar enough to blend smoothly
+Rules:
+- Generate 2-4 color stops
+- Each stop: {"color": "#RRGGBB", "stop": 0-100}
+- "stop" is the position: 0 = start, 100 = end
+- First stop must be 0, last must be 100
+- Middle stops create smooth transitions (e.g., 30, 60)
+- Match the visual essence of the description (e.g., "night sky" = dark blues, not bright)
+- For abstract concepts (e.g., "joy", "energy"), interpret the mood with appropriate colors
+- Adjacent colors should blend naturally
 
-Examples of good color accuracy:
-- "night sky" → ["#0a1128", "#1e3a8a"] (very dark blues)
-- "sunset" → ["#ff6b35", "#f7931e", "#feca57"] (warm oranges/yellows)
-- "forest" → ["#1a4d2e", "#4f7942"] (deep greens)
-- "ocean depth" → ["#001f3f", "#0074d9"] (dark to medium blue)
+Examples:
+- "night sky" → [{"color":"#0a1128","stop":0},{"color":"#1e3a8a","stop":100}]
+- "sunset" → [{"color":"#ff6b35","stop":0},{"color":"#f7931e","stop":40},{"color":"#feca57","stop":100}]
+- "forest" → [{"color":"#1a4d2e","stop":0},{"color":"#4f7942","stop":100}]
 
-Return ONLY a JSON array: ["#color1", "#color2", "#color3"]
-No explanation, markdown, or other text.`
+Return ONLY valid JSON. No markdown, no explanation.
+Format: [{"color":"#RRGGBB","stop":number}, ...]`
 
   try {
     // Require API key when using cloud
@@ -91,41 +94,54 @@ No explanation, markdown, or other text.`
       }
     }
 
-    let colorsArray: string[]
+    let parsed: unknown
     try {
-      colorsArray = JSON.parse(jsonMatch[0])
-    } catch (parseError) {
-      // Try to extract hex codes manually if JSON parsing fails
-      const hexMatches = content.match(/#[0-9A-F]{6}/gi)
-      if (hexMatches && hexMatches.length >= 2) {
-        colorsArray = hexMatches
-      } else {
-        throw new Error('Could not parse color array from Ollama response')
-      }
+      parsed = JSON.parse(jsonMatch[0])
+    } catch {
+      throw new Error('Could not parse JSON from Ollama response')
     }
-    
-    // Validate and format colors
-    const hexColors = colorsArray
-      .map((color: string) => {
-        // Ensure hex format
-        let cleanColor = color.trim().toUpperCase()
-        if (!cleanColor.startsWith('#')) {
-          cleanColor = `#${cleanColor.replace(/^#/, '')}`
-        }
-        // Ensure 6-digit hex
-        if (cleanColor.length === 4) {
-          // Convert #RGB to #RRGGBB
-          cleanColor = `#${cleanColor[1]}${cleanColor[1]}${cleanColor[2]}${cleanColor[2]}${cleanColor[3]}${cleanColor[3]}`
-        }
-        return cleanColor
+
+    if (!Array.isArray(parsed) || parsed.length < 2) {
+      throw new Error('Invalid response: Need at least 2 color stops')
+    }
+
+    // New format: [{"color":"#hex","stop":0},...]
+    const isNewFormat = parsed.every(
+      (x) => x && typeof x === 'object' && 'color' in x && 'stop' in x
+    )
+
+    if (isNewFormat) {
+      const stops: GradientStop[] = (parsed as { color?: string; stop?: number }[])
+        .map(({ color: c, stop: s }) => {
+          let color = String(c ?? '').trim()
+          if (!color.startsWith('#')) color = `#${color}`
+          if (color.length === 4)
+            color = `#${color[1]}${color[1]}${color[2]}${color[2]}${color[3]}${color[3]}`
+          const stop = Math.max(0, Math.min(100, Number(s) || 0))
+          return { color: color.toUpperCase(), stop: Math.round(stop) }
+        })
+        .filter((x) => /^#[0-9A-F]{6}$/i.test(x.color))
+
+      if (stops.length < 2) throw new Error('Invalid response: Need at least 2 valid color stops')
+      return stops.sort((a, b) => a.stop - b.stop)
+    }
+
+    // Legacy: plain hex array → even stops
+    const hex = (parsed as string[]).filter((x) => typeof x === 'string')
+    if (hex.length < 2) throw new Error('Invalid response: Need at least 2 colors')
+    const hexColors = hex
+      .map((c) => {
+        let s = String(c).trim()
+        if (!s.startsWith('#')) s = `#${s}`
+        if (s.length === 4) s = `#${s[1]}${s[1]}${s[2]}${s[2]}${s[3]}${s[3]}`
+        return s.toUpperCase()
       })
-      .filter((color: string) => /^#[0-9A-F]{6}$/i.test(color))
-
-    if (hexColors.length < 2) {
-      throw new Error('Invalid response: Need at least 2 colors for a gradient')
-    }
-
-    return hexColors
+      .filter((s) => /^#[0-9A-F]{6}$/i.test(s))
+    if (hexColors.length < 2) throw new Error('Invalid response: Need at least 2 valid hex colors')
+    return hexColors.map((color, i) => ({
+      color,
+      stop: Math.round((i / (hexColors.length - 1)) * 100),
+    }))
   } catch (error) {
     console.error('Error generating gradient from Ollama:', error)
     throw error

@@ -49,8 +49,8 @@ const DOWNLOAD_SIZES = [
 const plusCursor = `data:image/svg+xml;base64,${btoa(`
   <svg width="24" height="24" xmlns="http://www.w3.org/2000/svg">
     <rect x="0" y="0" width="24" height="24" fill="rgba(255,255,255,0.9)" stroke="rgba(0,0,0,0.15)" stroke-width="1"/>
-    <line x1="12" y1="7" x2="12" y2="17" stroke="#262626" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="7" y1="12" x2="17" y2="12" stroke="#262626" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="12" y1="8" x2="12" y2="16" stroke="#262626" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="8" y1="12" x2="16" y2="12" stroke="#262626" stroke-width="1.5" stroke-linecap="round"/>
   </svg>
 `)}`
 
@@ -186,12 +186,10 @@ export function App() {
     }
     setIsGenerating(true)
     try {
-      const colors = await generateGradientFromPrompt(inputValue.trim())
-      
-      // Create color stops from the generated colors (distribute evenly 0–100)
-      const newStops = colors.map((color, index) => ({
-        position: Math.round((index / (colors.length - 1)) * 100),
-        color: color,
+      const stops = await generateGradientFromPrompt(inputValue.trim())
+      const newStops = stops.map(({ color, stop }) => ({
+        position: stop,
+        color,
       }))
 
       const current = colorStopsRef.current
@@ -430,7 +428,7 @@ export function App() {
             return (
               <div
                 key={index}
-                className="absolute left-1/2 -translate-x-1/2 z-10"
+                className="absolute left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5"
                 style={{ 
                   ...(isBottom 
                     ? { bottom: `${BOTTOM_MARGIN}px` }
@@ -461,7 +459,7 @@ export function App() {
                     onMouseDown={(e) => e.stopPropagation()}
                   >
                     <div
-                      className="absolute inset-0 rounded-[2px]"
+                      className="absolute inset-0 rounded-none"
                       style={{ background: stop.color }}
                       aria-hidden
                     />
@@ -471,18 +469,6 @@ export function App() {
                   <span className="text-xs font-mono text-gray-800">
                     {stop.color.toUpperCase()}
                   </span>
-                  
-                  {/* Remove button - only show if more than 2 stops */}
-                  {colorStops.length > 2 && (
-                    <button
-                      type="button"
-                      onMouseDown={(e) => e.stopPropagation()}
-                      onClick={handleRemoveStop(index)}
-                      className="relative z-10 text-gray-800 text-lg leading-none hover:opacity-70 transition-opacity"
-                    >
-                      −
-                    </button>
-                  )}
 
                   {colorPickerFor === index && (
                     <div
@@ -493,6 +479,18 @@ export function App() {
                     </div>
                   )}
                 </div>
+
+                {/* Delete square — beside the pill, follows when dragged */}
+                {colorStops.length > 2 && (
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={handleRemoveStop(index)}
+                    className="w-6 h-6 flex items-center justify-center flex-shrink-0 bg-white/80 backdrop-blur-xl shadow rounded-none text-gray-800 text-lg leading-none hover:opacity-70 transition-opacity cursor-pointer"
+                  >
+                    −
+                  </button>
+                )}
               </div>
             )
           })}

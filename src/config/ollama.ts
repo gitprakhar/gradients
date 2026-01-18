@@ -5,7 +5,7 @@
 // VITE_OLLAMA_BASE_URL (auto-set: cloud=/api/ollama for Vite proxy, local=http://localhost:11434; override only if you have your own backend)
 // VITE_OLLAMA_MODEL=gpt-oss:20b-cloud (cloud model) or deepseek-r1:7b (local model)
 
-const useCloud = import.meta.env.VITE_OLLAMA_USE_CLOUD === 'false'
+const useCloud = import.meta.env.VITE_OLLAMA_USE_CLOUD === 'true'
 
 export const OLLAMA_CONFIG = {
   useCloud,
