@@ -29,6 +29,7 @@ export function App() {
   const [inputValue, setInputValue] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [downloadOpen, setDownloadOpen] = useState(false)
+  const [showDownload, setShowDownload] = useState(false)
   const pageRef = useRef<HTMLDivElement>(null)
   const colorInputRefs = useRef<(HTMLInputElement | null)[]>([])
   const hasDraggedRef = useRef<boolean>(false)
@@ -75,6 +76,7 @@ export function App() {
     const newStops = [...colorStops, { position: newPosition, color: newColor }]
     newStops.sort((a, b) => a.position - b.position)
     setColorStops(newStops)
+    setShowDownload(true)
   }
 
   const interpolateColor = (position: number) => {
@@ -94,6 +96,7 @@ export function App() {
     const newStops = [...colorStops]
     newStops[index].color = color
     setColorStops(newStops)
+    setShowDownload(true)
   }
 
   const handleCircleMouseDown = (index: number) => (e: React.MouseEvent) => {
@@ -115,6 +118,7 @@ export function App() {
     
     const newStops = colorStops.filter((_, i) => i !== index)
     setColorStops(newStops)
+    setShowDownload(true)
   }
 
   const handleGenerateGradient = async () => {
@@ -132,6 +136,7 @@ export function App() {
       }))
 
       setColorStops(newStops)
+      setShowDownload(true)
     } catch (error) {
       console.error('Failed to generate gradient:', error)
       // You could show an error message to the user here
@@ -165,6 +170,7 @@ export function App() {
       const newStops = [...colorStops]
       newStops[dragging].position = Math.round(percentage)
       setColorStops(newStops)
+      setShowDownload(true)
     }
 
     const handleMouseUp = () => {
@@ -291,7 +297,7 @@ export function App() {
       onMouseLeave={() => setShowPlusCursor(false)}
     >
           {/* Top left text input and download */}
-          <div className="absolute top-8 left-8 flex items-stretch gap-2">
+          <div className="absolute top-8 left-8 flex items-center gap-2">
             <div className="flex items-center">
               <span
                 ref={measureRef}
@@ -308,20 +314,20 @@ export function App() {
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleInputKeyDown}
                 disabled={isGenerating}
-                className="h-6 min-h-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow outline-none text-gray-800 text-xs font-sans leading-none placeholder:text-gray-600 focus:placeholder:text-gray-600 disabled:opacity-50"
+                className="h-6 min-h-0 m-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow outline-none text-gray-800 text-xs font-sans leading-none placeholder:text-gray-600 focus:placeholder:text-gray-600 disabled:opacity-50"
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
               />
             </div>
             <div
-              className="relative"
+              className="relative flex items-center"
               onMouseEnter={() => setDownloadOpen(true)}
               onMouseLeave={() => setDownloadOpen(false)}
             >
               <button
                 type="button"
                 onMouseDown={(e) => e.stopPropagation()}
-                className="h-6 min-h-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow text-gray-800 text-xs font-sans hover:opacity-90 transition-opacity"
+                className="h-6 min-h-0 m-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow text-gray-800 text-xs font-sans leading-none hover:opacity-90 transition-opacity"
               >
                 Download
               </button>
