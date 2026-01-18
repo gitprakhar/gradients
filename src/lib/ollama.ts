@@ -10,16 +10,22 @@ export interface GradientColors {
  */
 export async function generateGradientFromPrompt(prompt: string): Promise<string[]> {
   // Note: Local Ollama doesn't require an API key - it's optional for hosted instances
-  const systemPrompt = `You are a gradient color generator.
-Generate EXACTLY 2 hex colors for a smooth linear gradient.
+  const systemPrompt = `You are a gradient color generator that creates realistic, visually accurate gradients.
 
 Important rules:
-- Use appropriate darkness/lightness for the prompt (night = dark colors, sunset = warm colors, etc)
-- Only 2 colors for smooth blending
-- Think about the actual visual appearance, not just the concept
+- Generate 2-4 hex colors that blend smoothly together
+- Use colors that match the ACTUAL visual appearance (e.g., "night sky" should be very dark blues/purples, not bright blue)
+- Consider real-world lighting and color temperature
+- Adjacent colors should be similar enough to blend smoothly
 
-Return format: ["#color1", "#color2"]
-No explanation, just the JSON array.`
+Examples of good color accuracy:
+- "night sky" → ["#0a1128", "#1e3a8a"] (very dark blues)
+- "sunset" → ["#ff6b35", "#f7931e", "#feca57"] (warm oranges/yellows)
+- "forest" → ["#1a4d2e", "#4f7942"] (deep greens)
+- "ocean depth" → ["#001f3f", "#0074d9"] (dark to medium blue)
+
+Return ONLY a JSON array: ["#color1", "#color2", "#color3"]
+No explanation, markdown, or other text.`
 
   try {
     // Require API key when using cloud

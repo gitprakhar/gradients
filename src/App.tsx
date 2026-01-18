@@ -1,15 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
 import { generateGradientFromPrompt } from "@/lib/ollama"
+
+const DOWNLOAD_SIZES = [
+  { label: '16:9 (1920×1080)', width: 1920, height: 1080, name: '16-9' },
+  { label: '16:9 (1600×900)', width: 1600, height: 900, name: '16-9-small' },
+  { label: '4:3 (1920×1440)', width: 1920, height: 1440, name: '4-3' },
+  { label: '1:1 (1080×1080)', width: 1080, height: 1080, name: '1-1' },
+  { label: '21:9 (2560×1080)', width: 2560, height: 1080, name: '21-9' },
+  { label: '9:16 (1080×1920)', width: 1080, height: 1920, name: '9-16' },
+] as const
 
 // Create a plus cursor using SVG data URL
 const plusCursor = `data:image/svg+xml;base64,${btoa(`
@@ -29,16 +28,17 @@ export function App() {
   const [showPlusCursor, setShowPlusCursor] = useState(false)
   const [inputValue, setInputValue] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
+  const [downloadOpen, setDownloadOpen] = useState(false)
   const pageRef = useRef<HTMLDivElement>(null)
   const colorInputRefs = useRef<(HTMLInputElement | null)[]>([])
   const hasDraggedRef = useRef<boolean>(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const measureRef = useRef<HTMLSpanElement>(null)
-  
+
   // Measure input width based on current value
   useEffect(() => {
     if (measureRef.current && inputRef.current) {
-      const textToMeasure = inputValue || 'generate a gradient'
+      const textToMeasure = inputValue || 'Generate Anything'
       measureRef.current.textContent = textToMeasure
       const textWidth = measureRef.current.offsetWidth
       // Add padding: px-2 = 0.5rem (8px) on each side = 16px total
@@ -216,13 +216,6 @@ export function App() {
     });
   };
 
-  const handleCopyCode = () => {
-    const sortedStops = [...colorStops].sort((a, b) => a.position - b.position)
-    const stopsString = sortedStops.map(s => `${s.color} ${s.position}%`).join(', ')
-    const code = `background: linear-gradient(to bottom, ${stopsString});`;
-    navigator.clipboard.writeText(code);
-  };
-
   const gradientString = () => {
     const sortedStops = [...colorStops].sort((a, b) => a.position - b.position)
     return `linear-gradient(to bottom, ${sortedStops.map(s => `${s.color} ${s.position}%`).join(', ')})`
@@ -286,40 +279,74 @@ export function App() {
   }
 
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <div 
-          ref={pageRef}
-          className="w-screen h-screen relative" 
-          style={{
-            background: gradientString(),
-            cursor: showPlusCursor ? `url("${plusCursor}") 8 8, crosshair` : 'default'
-          }}
-          onClick={handleLineClick}
-          onMouseMove={handlePageMouseMove}
-          onMouseLeave={() => setShowPlusCursor(false)}
-        >
-          {/* Top left text input */}
-          <div className="absolute top-8 left-8 inline-block">
-            <span
-              ref={measureRef}
-              className="absolute invisible whitespace-pre text-xs font-sans"
-              style={{ visibility: 'hidden', position: 'absolute' }}
+    <div 
+      ref={pageRef}
+      className="w-screen h-screen relative" 
+      style={{
+        background: gradientString(),
+        cursor: showPlusCursor ? `url("${plusCursor}") 8 8, crosshair` : 'default'
+      }}
+      onClick={handleLineClick}
+      onMouseMove={handlePageMouseMove}
+      onMouseLeave={() => setShowPlusCursor(false)}
+    >
+          {/* Top left text input and download */}
+          <div className="absolute top-8 left-8 flex items-stretch gap-2">
+            <div className="flex items-center">
+              <span
+                ref={measureRef}
+                className="absolute invisible whitespace-pre text-xs font-sans"
+                style={{ visibility: 'hidden', position: 'absolute' }}
+              >
+                Generate Anything
+              </span>
+              <input
+                ref={inputRef}
+                type="text"
+                placeholder="Generate Anything"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleInputKeyDown}
+                disabled={isGenerating}
+                className="h-6 min-h-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow outline-none text-gray-800 text-xs font-sans leading-none placeholder:text-gray-600 focus:placeholder:text-gray-600 disabled:opacity-50"
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+              />
+            </div>
+            <div
+              className="relative"
+              onMouseEnter={() => setDownloadOpen(true)}
+              onMouseLeave={() => setDownloadOpen(false)}
             >
-              generate a gradient
-            </span>
-            <input
-              ref={inputRef}
-              type="text"
-              placeholder="generate a gradient"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleInputKeyDown}
-              disabled={isGenerating}
-              className="bg-white/80 backdrop-blur-xl px-2 py-1 shadow-lg outline-none text-gray-800 text-xs font-sans placeholder:text-gray-600 focus:placeholder:text-gray-600 disabled:opacity-50"
-              onClick={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
-            />
+              <button
+                type="button"
+                onMouseDown={(e) => e.stopPropagation()}
+                className="h-6 min-h-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow text-gray-800 text-xs font-sans hover:opacity-90 transition-opacity"
+              >
+                Download
+              </button>
+              {downloadOpen && (
+                <div
+                  className="absolute left-0 top-full mt-0 z-50 min-w-[180px] bg-white/80 backdrop-blur-xl shadow py-1"
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
+                  {DOWNLOAD_SIZES.map(({ label, width, height, name }) => (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDownload(width, height, name)
+                        setDownloadOpen(false)
+                      }}
+                      className="w-full text-left px-3 py-1.5 text-xs font-sans text-gray-800 hover:opacity-90"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Render all color stops as buttons */}
@@ -345,7 +372,7 @@ export function App() {
                 }}
               >
                 <div 
-                  className="flex items-center gap-1.5 bg-white/80 backdrop-blur-xl px-2 py-1 shadow-lg cursor-grab active:cursor-grabbing"
+                  className="flex items-center gap-1.5 bg-white/80 backdrop-blur-xl px-2 py-1 shadow cursor-grab active:cursor-grabbing"
                   onMouseDown={handleCircleMouseDown(index)}
                 >
                   {/* Color square */}
@@ -381,38 +408,7 @@ export function App() {
               </div>
             )
           })}
-        </div>
-      </ContextMenuTrigger>
-      <ContextMenuContent className="min-w-[220px]">
-        <ContextMenuSub>
-          <ContextMenuSubTrigger>Download Gradient</ContextMenuSubTrigger>
-          <ContextMenuSubContent>
-            <ContextMenuItem onClick={() => handleDownload(1920, 1080, '16-9')}>
-              16:9 (1920x1080)
-            </ContextMenuItem>
-            <ContextMenuItem onClick={() => handleDownload(1600, 900, '16-9-small')}>
-              16:9 (1600x900)
-            </ContextMenuItem>
-            <ContextMenuItem onClick={() => handleDownload(1920, 1440, '4-3')}>
-              4:3 (1920x1440)
-            </ContextMenuItem>
-            <ContextMenuItem onClick={() => handleDownload(1080, 1080, '1-1')}>
-              1:1 (1080x1080)
-            </ContextMenuItem>
-            <ContextMenuItem onClick={() => handleDownload(2560, 1080, '21-9')}>
-              21:9 (2560x1080)
-            </ContextMenuItem>
-            <ContextMenuItem onClick={() => handleDownload(1080, 1920, '9-16')}>
-              9:16 (1080x1920)
-            </ContextMenuItem>
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-        <ContextMenuSeparator />
-        <ContextMenuItem onClick={handleCopyCode}>
-          Copy CSS Code
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
+    </div>
   )
 }
 
