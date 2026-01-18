@@ -36,15 +36,22 @@ export function App() {
   const inputRef = useRef<HTMLInputElement>(null)
   const measureRef = useRef<HTMLSpanElement>(null)
 
-  // Measure input width based on current value
+  // Measure input width: min = "Generate Anything", expand only when prompt exceeds that
   useEffect(() => {
     if (measureRef.current && inputRef.current) {
+      // Minimum width = placeholder "Generate Anything"
+      measureRef.current.textContent = 'Generate Anything'
+      const minTextWidth = measureRef.current.offsetWidth
+
+      // Width for current content (when empty, use placeholder for measure)
       const textToMeasure = inputValue || 'Generate Anything'
       measureRef.current.textContent = textToMeasure
       const textWidth = measureRef.current.offsetWidth
-      // Add padding: px-2 = 0.5rem (8px) on each side = 16px total
+
+      // Padding: px-2 = 0.5rem (8px) on each side = 16px total
       const paddingWidth = 16
-      inputRef.current.style.width = `${textWidth + paddingWidth}px`
+      const width = Math.max(textWidth, minTextWidth) + paddingWidth
+      inputRef.current.style.width = `${width}px`
     }
   }, [inputValue])
 
@@ -240,7 +247,6 @@ export function App() {
     const BOTTOM_MARGIN = 32
     const pageHeight = rect.height
     const pageWidth = rect.width
-    const availableHeight = pageHeight - TOP_MARGIN - BOTTOM_MARGIN
     
     // Check if cursor is horizontally near the center (where buttons are)
     const centerX = pageWidth / 2
@@ -252,36 +258,15 @@ export function App() {
       return
     }
     
-    // Calculate button positions in pixels
     const sortedStops = [...colorStops].sort((a, b) => a.position - b.position)
     if (sortedStops.length < 2) {
       setShowPlusCursor(false)
       return
     }
     
-    // Check if cursor is between any adjacent pair of buttons
-    const buttonHalfHeight = 16
-    let isBetween = false
-    
-    for (let i = 0; i < sortedStops.length - 1; i++) {
-      const topStop = sortedStops[i]
-      const bottomStop = sortedStops[i + 1]
-      
-      const topButtonPosition = topStop.position === 0
-        ? TOP_MARGIN
-        : TOP_MARGIN + (topStop.position / 100) * availableHeight
-      
-      const bottomButtonPosition = bottomStop.position === 100
-        ? pageHeight - BOTTOM_MARGIN
-        : TOP_MARGIN + (bottomStop.position / 100) * availableHeight
-      
-      if (y > topButtonPosition + buttonHalfHeight && y < bottomButtonPosition - buttonHalfHeight) {
-        isBetween = true
-        break
-      }
-    }
-    
-    setShowPlusCursor(isBetween)
+    // Show plus in the full gradient strip: above, between, and below the buttons
+    const inGradientStrip = y >= TOP_MARGIN && y <= pageHeight - BOTTOM_MARGIN
+    setShowPlusCursor(inGradientStrip)
   }
 
   return (
@@ -345,7 +330,7 @@ export function App() {
                         handleDownload(width, height, name)
                         setDownloadOpen(false)
                       }}
-                      className="w-full text-left px-3 py-1.5 text-xs font-sans text-gray-800 hover:opacity-90"
+                      className="w-full text-left px-3 py-1.5 text-xs font-sans text-gray-800 hover:bg-gray-100"
                     >
                       {label}
                     </button>
