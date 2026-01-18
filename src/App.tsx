@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { HexColorPicker } from 'react-colorful'
 import { generateGradientFromPrompt } from "@/lib/ollama"
 
 // --- Color interpolation for gradient transition ---
@@ -64,8 +65,9 @@ export function App() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [downloadOpen, setDownloadOpen] = useState(false)
   const [showDownload, setShowDownload] = useState(false)
+  const [colorPickerFor, setColorPickerFor] = useState<number | null>(null)
+  const pickerPillRef = useRef<HTMLDivElement | null>(null)
   const pageRef = useRef<HTMLDivElement>(null)
-  const colorInputRefs = useRef<(HTMLInputElement | null)[]>([])
   const hasDraggedRef = useRef<boolean>(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const measureRef = useRef<HTMLSpanElement>(null)
@@ -76,6 +78,16 @@ export function App() {
   useEffect(() => () => {
     if (animationFrameIdRef.current != null) cancelAnimationFrame(animationFrameIdRef.current)
   }, [])
+
+  // Close color picker when mousedown outside the pill
+  useEffect(() => {
+    if (colorPickerFor === null) return
+    const onMouseDown = (e: MouseEvent) => {
+      if (!pickerPillRef.current?.contains(e.target as Node)) setColorPickerFor(null)
+    }
+    window.addEventListener('mousedown', onMouseDown)
+    return () => window.removeEventListener('mousedown', onMouseDown)
+  }, [colorPickerFor])
 
   // Measure input width: min = "Generate Anything", expand only when prompt exceeds that
   useEffect(() => {
@@ -147,6 +159,7 @@ export function App() {
   const handleCircleMouseDown = (index: number) => (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    setColorPickerFor(null)
     hasDraggedRef.current = false
     setDragging(index)
   }
@@ -373,7 +386,7 @@ export function App() {
               <button
                 type="button"
                 onMouseDown={(e) => e.stopPropagation()}
-                className="h-6 min-h-0 m-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow text-gray-800 text-xs font-sans leading-none hover:opacity-90 transition-opacity"
+                className="h-6 min-h-0 m-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow text-gray-800 text-xs font-sans leading-none hover:opacity-90 transition-opacity appearance-none"
               >
                 Download
               </button>
@@ -424,21 +437,25 @@ export function App() {
                 }}
               >
                 <div 
-                  className="flex items-center gap-1.5 bg-white/80 backdrop-blur-xl px-2 py-1 shadow cursor-grab active:cursor-grabbing"
+                  ref={colorPickerFor === index ? (el) => { pickerPillRef.current = el } : undefined}
+                  className="relative flex items-center gap-1.5 bg-white/80 backdrop-blur-xl px-2 py-1 shadow cursor-grab active:cursor-grabbing"
                   onMouseDown={handleCircleMouseDown(index)}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {/* Color square — open picker on mousedown; parent onClick stops click from creating a new stop */}
-                  <div 
-                    className="w-4 h-4 cursor-pointer"
-                    style={{ background: stop.color }}
-                    onMouseDown={(e) => {
-                      e.stopPropagation()
-                      colorInputRefs.current[index]?.click()
-                    }}
-                  />
+                  {/* Color square — only this opens the picker; input overlay for real click (Safari), stopPropagation so pill doesn’t drag */}
+                  <div
+                    className="relative w-4 h-4 flex-shrink-0 cursor-pointer"
+                    onClick={(e) => { e.stopPropagation(); setColorPickerFor((c) => (c === index ? null : index)) }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    <div
+                      className="absolute inset-0 rounded-[2px]"
+                      style={{ background: stop.color }}
+                      aria-hidden
+                    />
+                  </div>
                   
-                  {/* Hex code */}
+                  {/* Hex code — rest of pill is for drag */}
                   <span className="text-xs font-mono text-gray-800">
                     {stop.color.toUpperCase()}
                   </span>
@@ -446,23 +463,24 @@ export function App() {
                   {/* Remove button - only show if more than 2 stops */}
                   {colorStops.length > 2 && (
                     <button
+                      type="button"
+                      onMouseDown={(e) => e.stopPropagation()}
                       onClick={handleRemoveStop(index)}
-                      className="text-gray-800 text-lg leading-none hover:opacity-70 transition-opacity"
+                      className="relative z-10 text-gray-800 text-lg leading-none hover:opacity-70 transition-opacity"
                     >
                       −
                     </button>
                   )}
+
+                  {colorPickerFor === index && (
+                    <div
+                      className="absolute left-0 top-full z-50 mt-1 p-1.5 bg-white/95 backdrop-blur-xl shadow rounded"
+                      onMouseDown={(e) => e.stopPropagation()}
+                    >
+                      <HexColorPicker color={stop.color} onChange={(c) => handleColorChange(index, c)} />
+                    </div>
+                  )}
                 </div>
-                
-                <input 
-                  ref={(el) => { colorInputRefs.current[index] = el }}
-                  type="color" 
-                  value={stop.color}
-                  onChange={(e) => handleColorChange(index, e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="absolute opacity-0 w-0 h-0 p-0 m-0 border-0"
-                  style={{ clip: 'rect(0,0,0,0)' }}
-                />
               </div>
             )
           })}
