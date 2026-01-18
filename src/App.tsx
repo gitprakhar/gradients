@@ -17,25 +17,22 @@ export function App() {
     { position: 100, color: '#63B4E7' }
   ])
   const [dragging, setDragging] = useState<number | null>(null)
-  const sliderRef = useRef<HTMLDivElement>(null)
+  const pageRef = useRef<HTMLDivElement>(null)
   const colorInputRefs = useRef<(HTMLInputElement | null)[]>([])
-
-  const handleMouseDown = (index: number) => (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragging(index)
-  }
-  
-  const handleColorClick = (index: number) => (e: React.MouseEvent) => {
-    e.stopPropagation()
-    colorInputRefs.current[index]?.click()
-  }
+  const hasDraggedRef = useRef<boolean>(false)
 
   const handleLineClick = (e: React.MouseEvent) => {
-    if (!sliderRef.current || dragging !== null) return
+    if (!pageRef.current || dragging !== null) return
     
-    const rect = sliderRef.current.getBoundingClientRect()
+    // Prevent creating new stop if we just finished dragging
+    if (hasDraggedRef.current) {
+      hasDraggedRef.current = false
+      return
+    }
+    
+    const rect = pageRef.current.getBoundingClientRect()
     const y = e.clientY - rect.top
+    // Constrain to 0-100%
     const percentage = Math.max(0, Math.min(100, (y / rect.height) * 100))
     
     // Add new color stop at clicked position with interpolated color
@@ -66,6 +63,18 @@ export function App() {
     setColorStops(newStops)
   }
 
+  const handleCircleMouseDown = (index: number) => (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    hasDraggedRef.current = false
+    setDragging(index)
+  }
+
+  const handleCircleClick = (index: number) => (e: React.MouseEvent) => {
+    e.stopPropagation()
+    colorInputRefs.current[index]?.click()
+  }
+
   const handleRemoveStop = (index: number) => (e: React.MouseEvent) => {
     e.stopPropagation()
     // Keep at least 2 stops
@@ -77,12 +86,15 @@ export function App() {
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (dragging === null || !sliderRef.current) return
-
-      const rect = sliderRef.current.getBoundingClientRect()
+      if (dragging === null || !pageRef.current) return
+      
+      hasDraggedRef.current = true
+      
+      const rect = pageRef.current.getBoundingClientRect()
       const y = e.clientY - rect.top
+      // Constrain to 0-100%
       const percentage = Math.max(0, Math.min(100, (y / rect.height) * 100))
-
+      
       const newStops = [...colorStops]
       newStops[dragging].position = Math.round(percentage)
       setColorStops(newStops)
@@ -153,60 +165,69 @@ export function App() {
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div 
+          ref={pageRef}
           className="w-screen h-screen relative" 
           style={{
             background: gradientString()
           }}
+          onClick={handleLineClick}
         >
-          {/* Bottom center text */}
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-white text-xs font-sans">
+          {/* Top left text */}
+          <div 
+            className="absolute top-8 left-8 text-white text-xs font-sans"
+            onClick={(e) => e.stopPropagation()}
+          >
             right click to download
           </div>
 
-          {/* Vertical custom slider with multiple handles */}
-          <div className="absolute left-8 top-8">
-            <div 
-              ref={sliderRef}
-              className="relative w-px h-64 bg-white rounded-full cursor-pointer"
-              style={{ height: 'calc(100vh - 4rem)' }}
-              onClick={handleLineClick}
+          {/* Render all color stops as buttons */}
+          {colorStops.map((stop, index) => (
+            <div
+              key={index}
+              className="absolute left-1/2 -translate-x-1/2 z-10"
+              style={{ 
+                ...(stop.position === 100 
+                  ? { bottom: 0 }
+                  : { top: `${stop.position}%` }
+                ),
+              }}
             >
-              {/* Render all color stop squares */}
-              {colorStops.map((stop, index) => (
-                <div key={index} className="absolute" style={{ top: `${stop.position}%`, transform: 'translateY(-50%)' }}>
-                  <div className="flex items-center gap-2">
-                    {/* Color square */}
-                    <div
-                      className="w-5 h-5 -ml-2 cursor-pointer shadow-lg border-2 border-white"
-                      style={{ 
-                        background: stop.color
-                      }}
-                      onMouseDown={handleMouseDown(index)}
-                      onClick={handleColorClick(index)}
-                    />
-                    
-                    {/* Remove button - only show if more than 2 stops */}
-                    {colorStops.length > 2 && (
-                      <button
-                        onClick={handleRemoveStop(index)}
-                        className="w-4 h-4 flex items-center justify-center bg-white rounded-full text-gray-800 text-xs hover:bg-red-500 hover:text-white transition-colors"
-                      >
-                        −
-                      </button>
-                    )}
-                  </div>
-                  
-                  <input 
-                    ref={(el) => colorInputRefs.current[index] = el}
-                    type="color" 
-                    value={stop.color}
-                    onChange={(e) => handleColorChange(index, e.target.value)}
-                    className="hidden"
-                  />
-                </div>
-              ))}
+              <div 
+                className="flex items-center gap-1.5 bg-white/80 backdrop-blur-xl px-2 py-1 shadow-lg cursor-grab active:cursor-grabbing"
+                onMouseDown={handleCircleMouseDown(index)}
+                onClick={handleCircleClick(index)}
+              >
+                {/* Color square */}
+                <div 
+                  className="w-4 h-4 rounded"
+                  style={{ background: stop.color }}
+                />
+                
+                {/* Hex code */}
+                <span className="text-xs font-mono text-gray-800">
+                  {stop.color.toUpperCase()}
+                </span>
+                
+                {/* Remove button - only show if more than 2 stops */}
+                {colorStops.length > 2 && (
+                  <button
+                    onClick={handleRemoveStop(index)}
+                    className="w-4 h-4 flex items-center justify-center bg-gray-200 rounded text-gray-600 text-xs hover:bg-red-500 hover:text-white transition-colors"
+                  >
+                    −
+                  </button>
+                )}
+              </div>
+              
+              <input 
+                ref={(el) => { colorInputRefs.current[index] = el }}
+                type="color" 
+                value={stop.color}
+                onChange={(e) => handleColorChange(index, e.target.value)}
+                className="hidden"
+              />
             </div>
-          </div>
+          ))}
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent className="min-w-[220px]">
