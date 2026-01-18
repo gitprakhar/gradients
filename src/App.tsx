@@ -45,11 +45,12 @@ const DOWNLOAD_SIZES = [
   { label: '9:16 (1080×1920)', width: 1080, height: 1920, name: '9-16' },
 ] as const
 
-// Create a plus cursor using SVG data URL
+// Create a plus cursor: square with plus inside, 24px to match h-6 buttons
 const plusCursor = `data:image/svg+xml;base64,${btoa(`
-  <svg width="16" height="16" xmlns="http://www.w3.org/2000/svg">
-    <line x1="8" y1="2" x2="8" y2="14" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="2" y1="8" x2="14" y2="8" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+  <svg width="24" height="24" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="24" height="24" fill="rgba(255,255,255,0.9)" stroke="rgba(0,0,0,0.15)" stroke-width="1"/>
+    <line x1="12" y1="7" x2="12" y2="17" stroke="#262626" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="7" y1="12" x2="17" y2="12" stroke="#262626" stroke-width="1.5" stroke-linecap="round"/>
   </svg>
 `)}`
 
@@ -66,7 +67,8 @@ export function App() {
   const [downloadOpen, setDownloadOpen] = useState(false)
   const [showDownload, setShowDownload] = useState(false)
   const [colorPickerFor, setColorPickerFor] = useState<number | null>(null)
-  const pickerPillRef = useRef<HTMLDivElement | null>(null)
+  const [pickerPlaceAbove, setPickerPlaceAbove] = useState(false)
+  const pillRefs = useRef<(HTMLDivElement | null)[]>([])
   const pageRef = useRef<HTMLDivElement>(null)
   const hasDraggedRef = useRef<boolean>(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -83,7 +85,7 @@ export function App() {
   useEffect(() => {
     if (colorPickerFor === null) return
     const onMouseDown = (e: MouseEvent) => {
-      if (!pickerPillRef.current?.contains(e.target as Node)) setColorPickerFor(null)
+      if (!pillRefs.current[colorPickerFor]?.contains(e.target as Node)) setColorPickerFor(null)
     }
     window.addEventListener('mousedown', onMouseDown)
     return () => window.removeEventListener('mousedown', onMouseDown)
@@ -349,7 +351,7 @@ export function App() {
       className="w-screen h-screen relative" 
       style={{
         background: gradientString(),
-        cursor: showPlusCursor ? `url("${plusCursor}") 8 8, crosshair` : 'default'
+        cursor: showPlusCursor ? `url("${plusCursor}") 12 12, crosshair` : 'default'
       }}
       onClick={handleLineClick}
       onMouseMove={handlePageMouseMove}
@@ -437,7 +439,7 @@ export function App() {
                 }}
               >
                 <div 
-                  ref={colorPickerFor === index ? (el) => { pickerPillRef.current = el } : undefined}
+                  ref={(el) => { pillRefs.current[index] = el }}
                   className="relative flex items-center gap-1.5 bg-white/80 backdrop-blur-xl px-2 py-1 shadow cursor-grab active:cursor-grabbing"
                   onMouseDown={handleCircleMouseDown(index)}
                   onClick={(e) => e.stopPropagation()}
@@ -445,7 +447,17 @@ export function App() {
                   {/* Color square — only this opens the picker; input overlay for real click (Safari), stopPropagation so pill doesn’t drag */}
                   <div
                     className="relative w-4 h-4 flex-shrink-0 cursor-pointer"
-                    onClick={(e) => { e.stopPropagation(); setColorPickerFor((c) => (c === index ? null : index)) }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (colorPickerFor === index) {
+                        setColorPickerFor(null)
+                      } else {
+                        const rect = pillRefs.current[index]?.getBoundingClientRect()
+                        const pickerHeight = 240
+                        setPickerPlaceAbove(!!(rect && (window.innerHeight - rect.bottom) < pickerHeight))
+                        setColorPickerFor(index)
+                      }
+                    }}
                     onMouseDown={(e) => e.stopPropagation()}
                   >
                     <div
@@ -474,7 +486,7 @@ export function App() {
 
                   {colorPickerFor === index && (
                     <div
-                      className="absolute left-0 top-full z-50 mt-1 p-1.5 bg-white/95 backdrop-blur-xl shadow rounded"
+                      className={`gradients-color-picker absolute left-0 z-50 p-1.5 bg-white/95 backdrop-blur-xl shadow rounded-none ${pickerPlaceAbove ? 'bottom-full mb-1' : 'top-full mt-1'}`}
                       onMouseDown={(e) => e.stopPropagation()}
                     >
                       <HexColorPicker color={stop.color} onChange={(c) => handleColorChange(index, c)} />

@@ -136,6 +136,21 @@
   }
 }
 
+/* react-colorful: no corner radius, square pointers */
+.gradients-color-picker .react-colorful__saturation,
+.gradients-color-picker .react-colorful__last-control {
+  border-radius: 0;
+}
+.gradients-color-picker .react-colorful__pointer,
+.gradients-color-picker .react-colorful__pointer-fill {
+  border-radius: 0;
+}
+.gradients-color-picker .react-colorful__pointer {
+  width: 24px;
+  height: 24px;
+  border-color: var(--border);
+}
+
 @layer utilities {
   .scrollbar-hide {
     -ms-overflow-style: none;
