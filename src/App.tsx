@@ -1,6 +1,40 @@
 import { useState, useRef, useEffect } from 'react'
 import { generateGradientFromPrompt } from "@/lib/ollama"
 
+// --- Color interpolation for gradient transition ---
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const n = parseInt(hex.slice(1), 16)
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 }
+}
+function rgbToHex(r: number, g: number, b: number): string {
+  return '#' + [r, g, b].map((x) => Math.round(x).toString(16).padStart(2, '0')).join('')
+}
+function lerpHex(a: string, b: string, t: number): string {
+  const ra = hexToRgb(a), rb = hexToRgb(b)
+  return rgbToHex(
+    ra.r + (rb.r - ra.r) * t,
+    ra.g + (rb.g - ra.g) * t,
+    ra.b + (rb.b - ra.b) * t
+  )
+}
+function sampleGradient(stops: { position: number; color: string }[], p: number): string {
+  const sorted = [...stops].sort((a, b) => a.position - b.position)
+  if (p <= 0) return sorted[0].color
+  if (p >= 1) return sorted[sorted.length - 1].color
+  const pos = p * 100
+  for (let i = 0; i < sorted.length - 1; i++) {
+    if (pos >= sorted[i].position && pos <= sorted[i + 1].position) {
+      const d = sorted[i + 1].position - sorted[i].position
+      const t = d === 0 ? 1 : (pos - sorted[i].position) / d
+      return lerpHex(sorted[i].color, sorted[i + 1].color, t)
+    }
+  }
+  return sorted[0].color
+}
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+}
+
 const DOWNLOAD_SIZES = [
   { label: '16:9 (1920×1080)', width: 1920, height: 1080, name: '16-9' },
   { label: '16:9 (1600×900)', width: 1600, height: 900, name: '16-9-small' },
@@ -35,6 +69,13 @@ export function App() {
   const hasDraggedRef = useRef<boolean>(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const measureRef = useRef<HTMLSpanElement>(null)
+  const colorStopsRef = useRef(colorStops)
+  const animationFrameIdRef = useRef<number | null>(null)
+
+  useEffect(() => { colorStopsRef.current = colorStops }, [colorStops])
+  useEffect(() => () => {
+    if (animationFrameIdRef.current != null) cancelAnimationFrame(animationFrameIdRef.current)
+  }, [])
 
   // Measure input width: min = "Generate Anything", expand only when prompt exceeds that
   useEffect(() => {
@@ -131,22 +172,48 @@ export function App() {
   const handleGenerateGradient = async () => {
     if (!inputValue.trim() || isGenerating) return
 
+    if (animationFrameIdRef.current != null) {
+      cancelAnimationFrame(animationFrameIdRef.current)
+      animationFrameIdRef.current = null
+    }
     setIsGenerating(true)
     try {
       const colors = await generateGradientFromPrompt(inputValue.trim())
       
-      // Create color stops from the generated colors
-      // Distribute evenly from 0 to 100
+      // Create color stops from the generated colors (distribute evenly 0–100)
       const newStops = colors.map((color, index) => ({
         position: Math.round((index / (colors.length - 1)) * 100),
         color: color,
       }))
 
-      setColorStops(newStops)
+      const current = colorStopsRef.current
+      const startColors = newStops.map((s) => sampleGradient(current, s.position / 100))
+      const DURATION = 600
+      const rafState = { start: 0 }
+
+      const animate = (now: number) => {
+        if (!rafState.start) rafState.start = now
+        const elapsed = now - rafState.start
+        const t = Math.min(1, elapsed / DURATION)
+        const eased = easeInOutCubic(t)
+
+        const interpolated = newStops.map((stop, i) => ({
+          position: stop.position,
+          color: lerpHex(startColors[i], stop.color, eased),
+        }))
+        setColorStops(interpolated)
+
+        if (t < 1) {
+          animationFrameIdRef.current = requestAnimationFrame(animate)
+        } else {
+          setColorStops(newStops)
+          animationFrameIdRef.current = null
+        }
+      }
+      animationFrameIdRef.current = requestAnimationFrame(animate)
       setShowDownload(true)
     } catch (error) {
       console.error('Failed to generate gradient:', error)
-      // You could show an error message to the user here
     } finally {
       setIsGenerating(false)
     }
