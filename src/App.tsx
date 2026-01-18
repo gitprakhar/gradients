@@ -45,6 +45,20 @@ const DOWNLOAD_SIZES = [
   { label: '9:16 (1080×1920)', width: 1080, height: 1920, name: '9-16' },
 ] as const
 
+const PRESET_GRADIENTS: { title: string; stops: { color: string; stop: number }[] }[] = [
+  { title: 'Golden hour', stops: [{ color: '#b38117', stop: 0 }, { color: '#deae3a', stop: 30 }, { color: '#ffd265', stop: 60 }, { color: '#fff8c0', stop: 100 }] },
+  { title: 'Pink clouds at sunset', stops: [{ color: '#ffd1dc', stop: 0 }, { color: '#ffb6a4', stop: 60 }, { color: '#ff8a55', stop: 100 }] },
+  { title: 'Moss covered forest', stops: [{ color: '#1b2d1f', stop: 0 }, { color: '#2e4d3f', stop: 30 }, { color: '#5e8a5e', stop: 70 }, { color: '#8a6b3d', stop: 100 }] },
+  { title: 'Kind of blue', stops: [{ color: '#cce7ff', stop: 0 }, { color: '#a5ccef', stop: 60 }, { color: '#5f8dd5', stop: 100 }] },
+  { title: 'Cherry blossoms in spring', stops: [{ color: '#fff0f6', stop: 0 }, { color: '#f4b8c4', stop: 33 }, { color: '#eb6d95', stop: 66 }, { color: '#c03e6a', stop: 100 }] },
+  { title: 'Winter evening glow', stops: [{ color: '#0a1128', stop: 0 }, { color: '#e6ac53', stop: 60 }, { color: '#ffdfc7', stop: 100 }] },
+]
+
+function pickRandomPreset() {
+  const g = PRESET_GRADIENTS[Math.floor(Math.random() * PRESET_GRADIENTS.length)]
+  return { title: g.title, stops: g.stops.map((s) => ({ position: s.stop, color: s.color })) }
+}
+
 // Create a plus cursor: square with plus inside, 24px to match h-6 buttons
 const plusCursor = `data:image/svg+xml;base64,${btoa(`
   <svg width="24" height="24" xmlns="http://www.w3.org/2000/svg">
@@ -55,14 +69,14 @@ const plusCursor = `data:image/svg+xml;base64,${btoa(`
 `)}`
 
 export function App() {
-  // Array of color stops: { position: 0-100, color: string }
-  const [colorStops, setColorStops] = useState([
-    { position: 0, color: '#000518' },
-    { position: 100, color: '#63B4E7' }
-  ])
+  const initialPresetRef = useRef<ReturnType<typeof pickRandomPreset> | null>(null)
+  if (initialPresetRef.current === null) initialPresetRef.current = pickRandomPreset()
+
+  const [colorStops, setColorStops] = useState(initialPresetRef.current.stops)
   const [dragging, setDragging] = useState<number | null>(null)
   const [showPlusCursor, setShowPlusCursor] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [placeholderText, setPlaceholderText] = useState(initialPresetRef.current!.title)
   const [isGenerating, setIsGenerating] = useState(false)
   const [downloadOpen, setDownloadOpen] = useState(false)
   const [showDownload, setShowDownload] = useState(false)
@@ -91,24 +105,18 @@ export function App() {
     return () => window.removeEventListener('mousedown', onMouseDown)
   }, [colorPickerFor])
 
-  // Measure input width: min = "Generate Anything", expand only when prompt exceeds that
+  // Measure input width: min = placeholder, expand when prompt exceeds that
   useEffect(() => {
     if (measureRef.current && inputRef.current) {
-      // Minimum width = placeholder "Generate Anything"
-      measureRef.current.textContent = 'Generate Anything'
+      measureRef.current.textContent = placeholderText
       const minTextWidth = measureRef.current.offsetWidth
 
-      // Width for current content (when empty, use placeholder for measure)
-      const textToMeasure = inputValue || 'Generate Anything'
+      const textToMeasure = inputValue || placeholderText
       measureRef.current.textContent = textToMeasure
       const textWidth = measureRef.current.offsetWidth
-
-      // Padding: px-2 = 0.5rem (8px) on each side = 16px total
-      const paddingWidth = 16
-      const width = Math.max(textWidth, minTextWidth) + paddingWidth
-      inputRef.current.style.width = `${width}px`
+      inputRef.current.style.width = `${Math.max(textWidth, minTextWidth) + 16}px`
     }
-  }, [inputValue])
+  }, [inputValue, placeholderText])
 
   const handleLineClick = (e: React.MouseEvent) => {
     if (!pageRef.current || dragging !== null) return
@@ -178,7 +186,8 @@ export function App() {
   }
 
   const handleGenerateGradient = async () => {
-    if (!inputValue.trim() || isGenerating) return
+    const prompt = inputValue.trim()
+    if (!prompt || isGenerating) return
 
     if (animationFrameIdRef.current != null) {
       cancelAnimationFrame(animationFrameIdRef.current)
@@ -186,7 +195,7 @@ export function App() {
     }
     setIsGenerating(true)
     try {
-      const stops = await generateGradientFromPrompt(inputValue.trim())
+      const stops = await generateGradientFromPrompt(prompt)
       const newStops = stops.map(({ color, stop }) => ({
         position: stop,
         color,
@@ -218,6 +227,7 @@ export function App() {
       }
       animationFrameIdRef.current = requestAnimationFrame(animate)
       setShowDownload(true)
+      setPlaceholderText(prompt)
     } catch (error) {
       console.error('Failed to generate gradient:', error)
     } finally {
@@ -363,12 +373,13 @@ export function App() {
                 className="absolute invisible whitespace-pre text-xs font-sans"
                 style={{ visibility: 'hidden', position: 'absolute' }}
               >
-                Generate Anything
+                {placeholderText}
               </span>
               <input
                 ref={inputRef}
                 type="text"
-                placeholder="Generate Anything"
+                autoFocus
+                placeholder={placeholderText}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleInputKeyDown}
