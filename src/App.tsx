@@ -11,29 +11,68 @@ import {
 } from "@/components/ui/context-menu"
 
 export function App() {
-  // Two values: [startPosition, endPosition] as percentages (0-100)
-  const [colorStops, setColorStops] = useState([0, 100])
+  // Array of color stops: { position: 0-100, color: string }
+  const [colorStops, setColorStops] = useState([
+    { position: 0, color: '#000518' },
+    { position: 100, color: '#63B4E7' }
+  ])
   const [dragging, setDragging] = useState<number | null>(null)
   const sliderRef = useRef<HTMLDivElement>(null)
-  
-  const [startColor, setStartColor] = useState('#000518')
-  const [endColor, setEndColor] = useState('#63B4E7')
-  
-  const startColorInputRef = useRef<HTMLInputElement>(null)
-  const endColorInputRef = useRef<HTMLInputElement>(null)
+  const colorInputRefs = useRef<(HTMLInputElement | null)[]>([])
 
   const handleMouseDown = (index: number) => (e: React.MouseEvent) => {
     e.preventDefault()
+    e.stopPropagation()
     setDragging(index)
   }
   
   const handleColorClick = (index: number) => (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (index === 0) {
-      startColorInputRef.current?.click()
-    } else {
-      endColorInputRef.current?.click()
+    colorInputRefs.current[index]?.click()
+  }
+
+  const handleLineClick = (e: React.MouseEvent) => {
+    if (!sliderRef.current || dragging !== null) return
+    
+    const rect = sliderRef.current.getBoundingClientRect()
+    const y = e.clientY - rect.top
+    const percentage = Math.max(0, Math.min(100, (y / rect.height) * 100))
+    
+    // Add new color stop at clicked position with interpolated color
+    const newPosition = Math.round(percentage)
+    const newColor = interpolateColor(newPosition)
+    
+    const newStops = [...colorStops, { position: newPosition, color: newColor }]
+    newStops.sort((a, b) => a.position - b.position)
+    setColorStops(newStops)
+  }
+
+  const interpolateColor = (position: number) => {
+    // Find surrounding stops and interpolate color
+    const sortedStops = [...colorStops].sort((a, b) => a.position - b.position)
+    
+    for (let i = 0; i < sortedStops.length - 1; i++) {
+      if (position >= sortedStops[i].position && position <= sortedStops[i + 1].position) {
+        // Simple interpolation - just return the color of the lower stop for now
+        return sortedStops[i].color
+      }
     }
+    return colorStops[0].color
+  }
+
+  const handleColorChange = (index: number, color: string) => {
+    const newStops = [...colorStops]
+    newStops[index].color = color
+    setColorStops(newStops)
+  }
+
+  const handleRemoveStop = (index: number) => (e: React.MouseEvent) => {
+    e.stopPropagation()
+    // Keep at least 2 stops
+    if (colorStops.length <= 2) return
+    
+    const newStops = colorStops.filter((_, i) => i !== index)
+    setColorStops(newStops)
   }
 
   useEffect(() => {
@@ -45,7 +84,7 @@ export function App() {
       const percentage = Math.max(0, Math.min(100, (y / rect.height) * 100))
 
       const newStops = [...colorStops]
-      newStops[dragging] = Math.round(percentage)
+      newStops[dragging].position = Math.round(percentage)
       setColorStops(newStops)
     }
 
@@ -74,10 +113,12 @@ export function App() {
     canvas.width = width;
     canvas.height = height;
     
-    // Create gradient with adjustable color stops
+    // Create gradient with all color stops
     const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    gradient.addColorStop(colorStops[0] / 100, startColor);
-    gradient.addColorStop(colorStops[1] / 100, endColor);
+    const sortedStops = [...colorStops].sort((a, b) => a.position - b.position)
+    sortedStops.forEach(stop => {
+      gradient.addColorStop(stop.position / 100, stop.color)
+    })
     
     // Fill canvas with gradient
     ctx.fillStyle = gradient;
@@ -97,9 +138,16 @@ export function App() {
   };
 
   const handleCopyCode = () => {
-    const code = `background: linear-gradient(to bottom, ${startColor} ${colorStops[0]}%, ${endColor} ${colorStops[1]}%);`;
+    const sortedStops = [...colorStops].sort((a, b) => a.position - b.position)
+    const stopsString = sortedStops.map(s => `${s.color} ${s.position}%`).join(', ')
+    const code = `background: linear-gradient(to bottom, ${stopsString});`;
     navigator.clipboard.writeText(code);
   };
+
+  const gradientString = () => {
+    const sortedStops = [...colorStops].sort((a, b) => a.position - b.position)
+    return `linear-gradient(to bottom, ${sortedStops.map(s => `${s.color} ${s.position}%`).join(', ')})`
+  }
 
   return (
     <ContextMenu>
@@ -107,7 +155,7 @@ export function App() {
         <div 
           className="w-screen h-screen relative" 
           style={{
-            background: `linear-gradient(to bottom, ${startColor} ${colorStops[0]}%, ${endColor} ${colorStops[1]}%)`
+            background: gradientString()
           }}
         >
           {/* Bottom center text */}
@@ -115,59 +163,48 @@ export function App() {
             right click to download
           </div>
 
-          {/* Vertical custom slider with two handles */}
+          {/* Vertical custom slider with multiple handles */}
           <div className="absolute left-8 top-8">
             <div 
               ref={sliderRef}
-              className="relative w-px bg-white rounded-full cursor-pointer"
+              className="relative w-px h-64 bg-white rounded-full cursor-pointer"
               style={{ height: 'calc(100vh - 4rem)' }}
+              onClick={handleLineClick}
             >
-              {/* Track filled between the two dots */}
-              <div 
-                className="absolute w-full bg-white rounded-full"
-                style={{
-                  top: `${Math.min(colorStops[0], colorStops[1])}%`,
-                  height: `${Math.abs(colorStops[1] - colorStops[0])}%`
-                }}
-              />
-              
-              {/* First dot (start color) */}
-              <div
-                className="absolute w-5 h-5 -left-2 cursor-pointer shadow-lg border-2 border-white"
-                style={{ 
-                  top: `${colorStops[0]}%`, 
-                  transform: 'translateY(-50%)',
-                  background: startColor
-                }}
-                onMouseDown={handleMouseDown(0)}
-                onClick={handleColorClick(0)}
-              />
-              <input 
-                ref={startColorInputRef}
-                type="color" 
-                value={startColor}
-                onChange={(e) => setStartColor(e.target.value)}
-                className="hidden"
-              />
-              
-              {/* Second dot (end color) */}
-              <div
-                className="absolute w-5 h-5 -left-2 cursor-pointer shadow-lg border-2 border-white"
-                style={{ 
-                  top: `${colorStops[1]}%`, 
-                  transform: 'translateY(-50%)',
-                  background: endColor
-                }}
-                onMouseDown={handleMouseDown(1)}
-                onClick={handleColorClick(1)}
-              />
-              <input 
-                ref={endColorInputRef}
-                type="color" 
-                value={endColor}
-                onChange={(e) => setEndColor(e.target.value)}
-                className="hidden"
-              />
+              {/* Render all color stop squares */}
+              {colorStops.map((stop, index) => (
+                <div key={index} className="absolute" style={{ top: `${stop.position}%`, transform: 'translateY(-50%)' }}>
+                  <div className="flex items-center gap-2">
+                    {/* Color square */}
+                    <div
+                      className="w-5 h-5 -ml-2 cursor-pointer shadow-lg border-2 border-white"
+                      style={{ 
+                        background: stop.color
+                      }}
+                      onMouseDown={handleMouseDown(index)}
+                      onClick={handleColorClick(index)}
+                    />
+                    
+                    {/* Remove button - only show if more than 2 stops */}
+                    {colorStops.length > 2 && (
+                      <button
+                        onClick={handleRemoveStop(index)}
+                        className="w-4 h-4 flex items-center justify-center bg-white rounded-full text-gray-800 text-xs hover:bg-red-500 hover:text-white transition-colors"
+                      >
+                        −
+                      </button>
+                    )}
+                  </div>
+                  
+                  <input 
+                    ref={(el) => colorInputRefs.current[index] = el}
+                    type="color" 
+                    value={stop.color}
+                    onChange={(e) => handleColorChange(index, e.target.value)}
+                    className="hidden"
+                  />
+                </div>
+              ))}
             </div>
           </div>
         </div>
