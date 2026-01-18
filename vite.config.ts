@@ -13,4 +13,14 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    proxy: {
+      // Ollama Cloud: avoid CORS by proxying /api/ollama -> https://ollama.com/api
+      '/api/ollama': {
+        target: 'https://ollama.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/ollama/, '/api'),
+      },
+    },
+  },
 })

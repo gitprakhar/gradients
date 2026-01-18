@@ -13,9 +13,9 @@ import { generateGradientFromPrompt } from "@/lib/ollama"
 
 // Create a plus cursor using SVG data URL
 const plusCursor = `data:image/svg+xml;base64,${btoa(`
-  <svg width="24" height="24" xmlns="http://www.w3.org/2000/svg">
-    <line x1="12" y1="4" x2="12" y2="20" stroke="white" stroke-width="2" stroke-linecap="round"/>
-    <line x1="4" y1="12" x2="20" y2="12" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <svg width="16" height="16" xmlns="http://www.w3.org/2000/svg">
+    <line x1="8" y1="2" x2="8" y2="14" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="2" y1="8" x2="14" y2="8" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
   </svg>
 `)}`
 
@@ -293,7 +293,7 @@ export function App() {
           className="w-screen h-screen relative" 
           style={{
             background: gradientString(),
-            cursor: showPlusCursor ? `url("${plusCursor}") 12 12, crosshair` : 'default'
+            cursor: showPlusCursor ? `url("${plusCursor}") 8 8, crosshair` : 'default'
           }}
           onClick={handleLineClick}
           onMouseMove={handlePageMouseMove}
@@ -336,7 +336,7 @@ export function App() {
             return (
               <div
                 key={index}
-                className="absolute left-1/2 -translate-x-1/2 z-10 flex items-center gap-2"
+                className="absolute left-1/2 -translate-x-1/2 z-10"
                 style={{ 
                   ...(isBottom 
                     ? { bottom: `${BOTTOM_MARGIN}px` }
@@ -359,17 +359,17 @@ export function App() {
                   <span className="text-xs font-mono text-gray-800">
                     {stop.color.toUpperCase()}
                   </span>
+                  
+                  {/* Remove button - only show if more than 2 stops */}
+                  {colorStops.length > 2 && (
+                    <button
+                      onClick={handleRemoveStop(index)}
+                      className="text-gray-800 text-lg leading-none hover:opacity-70 transition-opacity"
+                    >
+                      −
+                    </button>
+                  )}
                 </div>
-                
-                {/* Remove button - only show if more than 2 stops */}
-                {colorStops.length > 2 && (
-                  <button
-                    onClick={handleRemoveStop(index)}
-                    className="text-white text-lg leading-none hover:opacity-70 transition-opacity"
-                  >
-                    −
-                  </button>
-                )}
                 
                 <input 
                   ref={(el) => { colorInputRefs.current[index] = el }}

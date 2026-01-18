@@ -10,25 +10,36 @@ export interface GradientColors {
  */
 export async function generateGradientFromPrompt(prompt: string): Promise<string[]> {
   // Note: Local Ollama doesn't require an API key - it's optional for hosted instances
-  const systemPrompt = `You are a gradient color generator. Given a text prompt, generate a beautiful linear gradient by providing hex color codes.
-  
-Return ONLY a JSON array of hex color codes (e.g., ["#FF0000", "#00FF00", "#0000FF"]). 
-Use as many colors as needed to create the perfect gradient for the given prompt.
-Do not include any explanation, markdown, or other text - just the JSON array.`
+  const systemPrompt = `You are a gradient color generator.
+Generate EXACTLY 2 hex colors for a smooth linear gradient.
+
+Important rules:
+- Use appropriate darkness/lightness for the prompt (night = dark colors, sunset = warm colors, etc)
+- Only 2 colors for smooth blending
+- Think about the actual visual appearance, not just the concept
+
+Return format: ["#color1", "#color2"]
+No explanation, just the JSON array.`
 
   try {
+    // Require API key when using cloud
+    if (OLLAMA_CONFIG.useCloud && !OLLAMA_CONFIG.apiKey) {
+      throw new Error('API key is required when using Ollama Cloud. Please set VITE_OLLAMA_API_KEY in .env.local')
+    }
+
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
     }
 
-    // Add Authorization header only if API key is provided (optional for local Ollama)
+    // Add Authorization header if API key is provided (required for cloud, optional for local)
     if (OLLAMA_CONFIG.apiKey) {
       headers['Authorization'] = `Bearer ${OLLAMA_CONFIG.apiKey}`
     }
 
-    console.log('Calling Ollama at:', `${OLLAMA_CONFIG.baseUrl}/api/chat`)
+    const chatPath = OLLAMA_CONFIG.useCloud ? '/chat' : '/api/chat'
+    const url = `${OLLAMA_CONFIG.baseUrl}${chatPath}`
 
-    const response = await fetch(`${OLLAMA_CONFIG.baseUrl}/api/chat`, {
+    const response = await fetch(url, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -49,7 +60,12 @@ Do not include any explanation, markdown, or other text - just the JSON array.`
 
     if (!response.ok) {
       const errorText = await response.text()
-      throw new Error(`Ollama API error (${response.status}): ${errorText || response.statusText}`)
+      let errMsg = `Ollama API error (${response.status}): ${errorText || response.statusText}`
+      try {
+        const errJson = errorText ? JSON.parse(errorText) : null
+        if (errJson?.error) errMsg = `Ollama: ${errJson.error}`
+      } catch (_) {}
+      throw new Error(errMsg)
     }
 
     const data = await response.json()
