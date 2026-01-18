@@ -9,6 +9,7 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
+import { generateGradientFromPrompt } from "@/lib/ollama"
 
 // Create a plus cursor using SVG data URL
 const plusCursor = `data:image/svg+xml;base64,${btoa(`
@@ -27,6 +28,7 @@ export function App() {
   const [dragging, setDragging] = useState<number | null>(null)
   const [showPlusCursor, setShowPlusCursor] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
   const pageRef = useRef<HTMLDivElement>(null)
   const colorInputRefs = useRef<(HTMLInputElement | null)[]>([])
   const hasDraggedRef = useRef<boolean>(false)
@@ -38,8 +40,10 @@ export function App() {
     if (measureRef.current && inputRef.current) {
       const textToMeasure = inputValue || 'generate a gradient'
       measureRef.current.textContent = textToMeasure
-      const width = measureRef.current.offsetWidth
-      inputRef.current.style.width = `${width}px`
+      const textWidth = measureRef.current.offsetWidth
+      // Add padding: px-2 = 0.5rem (8px) on each side = 16px total
+      const paddingWidth = 16
+      inputRef.current.style.width = `${textWidth + paddingWidth}px`
     }
   }, [inputValue])
 
@@ -111,6 +115,36 @@ export function App() {
     
     const newStops = colorStops.filter((_, i) => i !== index)
     setColorStops(newStops)
+  }
+
+  const handleGenerateGradient = async () => {
+    if (!inputValue.trim() || isGenerating) return
+
+    setIsGenerating(true)
+    try {
+      const colors = await generateGradientFromPrompt(inputValue.trim())
+      
+      // Create color stops from the generated colors
+      // Distribute evenly from 0 to 100
+      const newStops = colors.map((color, index) => ({
+        position: Math.round((index / (colors.length - 1)) * 100),
+        color: color,
+      }))
+
+      setColorStops(newStops)
+    } catch (error) {
+      console.error('Failed to generate gradient:', error)
+      // You could show an error message to the user here
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleGenerateGradient()
+    }
   }
 
   useEffect(() => {
@@ -272,7 +306,7 @@ export function App() {
               className="absolute invisible whitespace-pre text-xs font-sans"
               style={{ visibility: 'hidden', position: 'absolute' }}
             >
-              Generate a custom gradient
+              generate a gradient
             </span>
             <input
               ref={inputRef}
@@ -280,7 +314,9 @@ export function App() {
               placeholder="generate a gradient"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              className="bg-transparent border-b border-white outline-none text-white text-xs font-sans placeholder:text-white focus:placeholder:text-white pb-0.5"
+              onKeyDown={handleInputKeyDown}
+              disabled={isGenerating}
+              className="bg-white/80 backdrop-blur-xl px-2 py-1 shadow-lg outline-none text-gray-800 text-xs font-sans placeholder:text-gray-600 focus:placeholder:text-gray-600 disabled:opacity-50"
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
             />
