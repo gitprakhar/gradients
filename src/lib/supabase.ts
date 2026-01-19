@@ -19,7 +19,7 @@ export function logGradientGeneration(
   userQuery: string,
   gradientJson: GradientStopRow[]
 ): void {
-  if (!supabase) return
+  if (!supabase || !import.meta.env.PROD) return
 
   void supabase
     .from('gradient_generations')
