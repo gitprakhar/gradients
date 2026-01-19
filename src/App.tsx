@@ -83,6 +83,7 @@ export function App() {
   const [colorPickerFor, setColorPickerFor] = useState<number | null>(null)
   const [pickerPlaceAbove, setPickerPlaceAbove] = useState(false)
   const pillRefs = useRef<(HTMLDivElement | null)[]>([])
+  const stopContainerRefs = useRef<(HTMLDivElement | null)[]>([])
   const pageRef = useRef<HTMLDivElement>(null)
   const hasDraggedRef = useRef<boolean>(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -179,7 +180,9 @@ export function App() {
     e.stopPropagation()
     // Keep at least 2 stops
     if (colorStops.length <= 2) return
-    
+
+    if (colorPickerFor === index) setColorPickerFor(null)
+
     const newStops = colorStops.filter((_, i) => i !== index)
     setColorStops(newStops)
     setShowDownload(true)
@@ -330,18 +333,20 @@ export function App() {
     const TOP_MARGIN = 32
     const BOTTOM_MARGIN = 32
     const pageHeight = rect.height
-    const pageWidth = rect.width
-    
-    // Check if cursor is horizontally near the center (where buttons are)
-    const centerX = pageWidth / 2
-    const buttonWidthTolerance = 150 // Approximate button width tolerance
-    const isNearCenter = Math.abs(x - centerX) < buttonWidthTolerance
-    
-    if (!isNearCenter) {
+
+    // Only show plus cursor within the horizontal width of the buttons
+    let leftMost = Infinity, rightMost = -Infinity
+    for (const el of stopContainerRefs.current) {
+      if (!el) continue
+      const r = el.getBoundingClientRect()
+      leftMost = Math.min(leftMost, r.left - rect.left)
+      rightMost = Math.max(rightMost, r.right - rect.left)
+    }
+    if (leftMost === Infinity || x < leftMost || x > rightMost) {
       setShowPlusCursor(false)
       return
     }
-    
+
     const sortedStops = [...colorStops].sort((a, b) => a.position - b.position)
     if (sortedStops.length < 2) {
       setShowPlusCursor(false)
@@ -365,8 +370,8 @@ export function App() {
       onMouseMove={handlePageMouseMove}
       onMouseLeave={() => setShowPlusCursor(false)}
     >
-          {/* Top left text input and download */}
-          <div className="absolute top-8 left-8 flex items-center gap-2">
+          {/* Top: input left, download right on mobile; both left on sm+ */}
+          <div className="absolute top-8 left-8 right-8 sm:right-auto flex items-center justify-between sm:justify-start gap-2">
             <div className="flex items-center">
               <span
                 ref={measureRef}
@@ -403,7 +408,7 @@ export function App() {
               </button>
               {downloadOpen && (
                 <div
-                  className="absolute left-0 top-full mt-0 z-50 min-w-[180px] bg-white/80 backdrop-blur-xl shadow py-1"
+                  className="absolute right-0 left-auto sm:left-0 sm:right-auto top-full mt-0 z-50 min-w-[180px] bg-white/80 backdrop-blur-xl shadow py-1"
                   onMouseDown={(e) => e.stopPropagation()}
                 >
                   {DOWNLOAD_SIZES.map(({ label, width, height, name }) => (
@@ -439,7 +444,8 @@ export function App() {
             return (
               <div
                 key={index}
-                className="absolute left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5"
+                ref={(el) => { stopContainerRefs.current[index] = el }}
+                className={`absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5 ${colorPickerFor === index ? 'z-[100]' : 'z-10'}`}
                 style={{ 
                   ...(isBottom 
                     ? { bottom: `${BOTTOM_MARGIN}px` }
@@ -449,7 +455,7 @@ export function App() {
               >
                 <div 
                   ref={(el) => { pillRefs.current[index] = el }}
-                  className="relative flex items-center gap-1.5 bg-white/80 backdrop-blur-xl px-2 py-1 shadow cursor-grab active:cursor-grabbing"
+                  className={`relative flex items-center gap-1.5 bg-white/80 backdrop-blur-xl px-2 py-1 shadow cursor-grab active:cursor-grabbing ${colorPickerFor === index ? 'z-10' : ''}`}
                   onMouseDown={handleCircleMouseDown(index)}
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -483,7 +489,7 @@ export function App() {
 
                   {colorPickerFor === index && (
                     <div
-                      className={`gradients-color-picker absolute left-0 z-50 p-1.5 bg-white/95 backdrop-blur-xl shadow rounded-none ${pickerPlaceAbove ? 'bottom-full mb-1' : 'top-full mt-1'}`}
+                      className={`gradients-color-picker absolute left-0 z-[100] p-1.5 bg-white/95 backdrop-blur-xl shadow rounded-none ${pickerPlaceAbove ? 'bottom-full mb-1' : 'top-full mt-1'}`}
                       onMouseDown={(e) => e.stopPropagation()}
                     >
                       <HexColorPicker color={stop.color} onChange={(c) => handleColorChange(index, c)} />
