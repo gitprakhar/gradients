@@ -487,9 +487,9 @@ export function App() {
           ) : (
             <>
               {/* Top: input left, download right on mobile; both left on sm+ */}
-              <div className="absolute top-8 left-8 right-8 sm:right-auto space-y-1">
-                <div className="flex items-center justify-between sm:justify-start gap-2">
-                  <div className="flex items-center">
+              <div className="absolute top-8 left-8 right-8 sm:right-auto sm:max-w-[min(38vw,540px)] space-y-1">
+                <div className="flex items-center justify-between sm:justify-start gap-2 min-w-0">
+                  <div className="flex items-center min-w-0 flex-1">
                     <span
                       ref={measureRef}
                       className="absolute invisible whitespace-pre text-xs font-sans"
@@ -506,13 +506,13 @@ export function App() {
                       onChange={(e) => setInputValue(e.target.value)}
                       onKeyDown={handleInputKeyDown}
                       disabled={isGenerating}
-                      className="h-6 min-h-0 m-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow outline-none text-gray-800 text-xs font-sans leading-none placeholder:text-gray-600 focus:placeholder:text-gray-600 disabled:opacity-50"
+                      className="h-6 min-h-0 m-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow outline-none text-gray-800 text-xs font-sans leading-none placeholder:text-gray-600 focus:placeholder:text-gray-600 disabled:opacity-50 max-w-full"
                       onClick={(e) => e.stopPropagation()}
                       onMouseDown={(e) => e.stopPropagation()}
                     />
                   </div>
                   <div
-                    className="relative flex items-center"
+                    className="relative flex items-center flex-shrink-0"
                     onMouseEnter={() => setDownloadOpen(true)}
                     onMouseLeave={() => setDownloadOpen(false)}
                   >
@@ -553,7 +553,8 @@ export function App() {
                 )}
               </div>
 
-              {/* Render all color stops as buttons */}
+              {/* Color stop controls: hidden on mobile, only search + download; visible from sm+ */}
+              <div className="hidden sm:block">
               {colorStops.map((stop, index) => {
             const BOTTOM_MARGIN = 32
             const pageHeight = pageRef.current?.clientHeight || window.innerHeight
@@ -633,6 +634,7 @@ export function App() {
               </div>
             )
           })}
+              </div>
             </>
           )}
     </div>
