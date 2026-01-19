@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { HexColorPicker } from 'react-colorful'
 import { generateGradientFromPrompt } from "@/lib/ollama"
+import { logGradientGeneration } from "@/lib/supabase"
 
 // --- Color interpolation for gradient transition ---
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
@@ -280,6 +281,7 @@ export function App() {
 
     try {
       const stops = await generateGradientFromPrompt(prompt)
+      logGradientGeneration(prompt, stops)
       setHasCompletedFirstGeneration(true)
       if (animationFrameIdRef.current != null) {
         cancelAnimationFrame(animationFrameIdRef.current)
