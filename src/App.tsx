@@ -36,6 +36,44 @@ function easeInOutCubic(t: number): number {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
 }
 
+// --- Hue rotation for pre-response "loading" animation ---
+function rgbToHsv(r: number, g: number, b: number): { h: number; s: number; v: number } {
+  r /= 255; g /= 255; b /= 255
+  const max = Math.max(r, g, b), min = Math.min(r, g, b)
+  const d = max - min
+  const v = max
+  const s = max === 0 ? 0 : d / max
+  let h = 0
+  if (d !== 0) {
+    if (max === r) h = (g - b) / d + (g < b ? 6 : 0)
+    else if (max === g) h = (b - r) / d + 2
+    else h = (r - g) / d + 4
+    h /= 6
+  }
+  return { h: h * 360, s, v }
+}
+function hsvToRgb(h: number, s: number, v: number): { r: number; g: number; b: number } {
+  h = ((h % 360) + 360) % 360 / 360
+  const i = Math.floor(h * 6), f = h * 6 - i
+  const p = v * (1 - s), q = v * (1 - f * s), t = v * (1 - (1 - f) * s)
+  let r = 0, g = 0, b = 0
+  switch (i % 6) {
+    case 0: r = v; g = t; b = p; break
+    case 1: r = q; g = v; b = p; break
+    case 2: r = p; g = v; b = t; break
+    case 3: r = p; g = q; b = v; break
+    case 4: r = t; g = p; b = v; break
+    case 5: r = v; g = p; b = q; break
+  }
+  return { r: r * 255, g: g * 255, b: b * 255 }
+}
+function rotateHue(hex: string, degrees: number): string {
+  const { r, g, b } = hexToRgb(hex)
+  const { h, s, v } = rgbToHsv(r, g, b)
+  const { r: R, g: G, b: B } = hsvToRgb(h + degrees, s, v)
+  return rgbToHex(R, G, B)
+}
+
 const DOWNLOAD_SIZES = [
   { label: '16:9 (1920×1080)', width: 1920, height: 1080, name: '16-9' },
   { label: '16:9 (1600×900)', width: 1600, height: 900, name: '16-9-small' },
@@ -90,6 +128,7 @@ export function App() {
   const measureRef = useRef<HTMLSpanElement>(null)
   const colorStopsRef = useRef(colorStops)
   const animationFrameIdRef = useRef<number | null>(null)
+  const preGenerateStopsRef = useRef<{ position: number; color: string }[]>([])
 
   useEffect(() => { colorStopsRef.current = colorStops }, [colorStops])
   useEffect(() => () => {
@@ -193,23 +232,43 @@ export function App() {
       cancelAnimationFrame(animationFrameIdRef.current)
       animationFrameIdRef.current = null
     }
+
+    const snapshot = colorStopsRef.current.map((s) => ({ position: s.position, color: s.color }))
+    preGenerateStopsRef.current = snapshot
     setGenerateError(null)
     setIsGenerating(true)
+
+    // Pre-response: colors start changing immediately (hue rotation) while the model runs
+    const rafState = { start: 0 }
+    const animatePre = (now: number) => {
+      if (!rafState.start) rafState.start = now
+      const elapsed = now - rafState.start
+      const hueOffset = (elapsed * 0.08) % 360
+      const next = preGenerateStopsRef.current.map((s) => ({
+        position: s.position,
+        color: rotateHue(s.color, hueOffset),
+      }))
+      setColorStops(next)
+      animationFrameIdRef.current = requestAnimationFrame(animatePre)
+    }
+    animationFrameIdRef.current = requestAnimationFrame(animatePre)
+
     try {
       const stops = await generateGradientFromPrompt(prompt)
-      const newStops = stops.map(({ color, stop }) => ({
-        position: stop,
-        color,
-      }))
+      if (animationFrameIdRef.current != null) {
+        cancelAnimationFrame(animationFrameIdRef.current)
+        animationFrameIdRef.current = null
+      }
 
+      const newStops = stops.map(({ color, stop }) => ({ position: stop, color }))
       const current = colorStopsRef.current
       const startColors = newStops.map((s) => sampleGradient(current, s.position / 100))
       const DURATION = 600
-      const rafState = { start: 0 }
+      const transitionState = { start: 0 }
 
-      const animate = (now: number) => {
-        if (!rafState.start) rafState.start = now
-        const elapsed = now - rafState.start
+      const animateToResult = (now: number) => {
+        if (!transitionState.start) transitionState.start = now
+        const elapsed = now - transitionState.start
         const t = Math.min(1, elapsed / DURATION)
         const eased = easeInOutCubic(t)
 
@@ -220,15 +279,20 @@ export function App() {
         setColorStops(interpolated)
 
         if (t < 1) {
-          animationFrameIdRef.current = requestAnimationFrame(animate)
+          animationFrameIdRef.current = requestAnimationFrame(animateToResult)
         } else {
           setColorStops(newStops)
           animationFrameIdRef.current = null
         }
       }
-      animationFrameIdRef.current = requestAnimationFrame(animate)
+      animationFrameIdRef.current = requestAnimationFrame(animateToResult)
       setPlaceholderText(prompt)
     } catch (error) {
+      if (animationFrameIdRef.current != null) {
+        cancelAnimationFrame(animationFrameIdRef.current)
+        animationFrameIdRef.current = null
+      }
+      setColorStops(preGenerateStopsRef.current)
       const msg = error instanceof Error ? error.message : String(error)
       console.error('Failed to generate gradient:', error)
       setGenerateError(msg)
