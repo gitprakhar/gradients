@@ -462,9 +462,9 @@ export function App() {
       onMouseLeave={() => setShowPlusCursor(false)}
     >
           {!hasCompletedFirstGeneration ? (
-            /* Landing: gradient + centered input only; no download, no color pills */
+            /* Landing: gradient + input only; on mobile at bottom, on desktop centered */
             <div
-              className="absolute inset-0 flex items-center justify-center"
+              className="absolute inset-0 flex flex-col items-center justify-end sm:justify-center pb-6 sm:pb-0"
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
             >
@@ -499,8 +499,8 @@ export function App() {
             </div>
           ) : (
             <>
-              {/* Mobile: centered, input + square download button; sm+: top-left row with "Download" text */}
-              <div className="absolute inset-0 sm:inset-auto sm:top-8 sm:left-8 sm:right-auto sm:bottom-auto sm:max-w-[min(48vw,1100px)] flex flex-col items-center justify-center sm:items-stretch sm:justify-start gap-1">
+              {/* Mobile: input + download at bottom; sm+: top-left row with "Download" text */}
+              <div className="absolute inset-0 sm:inset-auto sm:top-8 sm:left-8 sm:right-auto sm:bottom-auto sm:max-w-[min(48vw,1100px)] flex flex-col items-center justify-end sm:items-stretch sm:justify-start gap-1 pb-6 sm:pb-0">
                 <div className="flex flex-row items-center justify-center sm:justify-start gap-2 min-w-0 max-w-[calc(100vw-4rem)] px-4 sm:px-0">
                   <div className="flex items-center min-w-0 flex-1 sm:flex-1">
                     <span
