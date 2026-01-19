@@ -126,13 +126,36 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* Lock viewport height on mobile: no scroll, exact screen height */
+html {
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  font-size: 16px;
+}
+/* Scale typography and rem-based spacing with viewport on desktop (4K, etc.) */
+@media (min-width: 640px) {
+  html {
+    font-size: clamp(14px, 1vw, 36px);
+  }
+}
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  @apply bg-background text-foreground;
+  font-family: var(--font-sans);
+}
+#root {
+  height: 100%;
+  overflow: hidden;
+  min-height: 0;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-    font-family: var(--font-sans);
   }
 }
 

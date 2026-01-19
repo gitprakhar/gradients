@@ -168,7 +168,10 @@ export function App() {
       const textToMeasure = inputValue || placeholderText
       measureRef.current.textContent = textToMeasure
       const textWidth = measureRef.current.offsetWidth
-      inputRef.current.style.width = `${Math.max(textWidth, minTextWidth) + 16}px`
+
+      const { paddingLeft, paddingRight } = getComputedStyle(inputRef.current)
+      const padding = parseFloat(paddingLeft) + parseFloat(paddingRight)
+      inputRef.current.style.width = `${Math.max(textWidth, minTextWidth) + padding}px`
     }
   }, [inputValue, placeholderText])
 
@@ -439,7 +442,7 @@ export function App() {
   return (
     <div 
       ref={pageRef}
-      className="w-screen h-screen relative" 
+      className="w-full h-full min-h-0 relative overflow-hidden" 
       style={{
         background: gradientString(),
         cursor: hasCompletedFirstGeneration && showPlusCursor ? `url("${plusCursor}") 12 12, crosshair` : 'default'
@@ -487,7 +490,7 @@ export function App() {
           ) : (
             <>
               {/* Mobile: centered, input + square download button; sm+: top-left row with "Download" text */}
-              <div className="absolute inset-0 sm:inset-auto sm:top-8 sm:left-8 sm:right-auto sm:bottom-auto sm:max-w-[min(38vw,540px)] flex flex-col items-center justify-center sm:items-stretch sm:justify-start gap-1">
+              <div className="absolute inset-0 sm:inset-auto sm:top-8 sm:left-8 sm:right-auto sm:bottom-auto sm:max-w-[min(48vw,1100px)] flex flex-col items-center justify-center sm:items-stretch sm:justify-start gap-1">
                 <div className="flex flex-row items-center justify-center sm:justify-start gap-2 min-w-0 max-w-[calc(100vw-4rem)] px-4 sm:px-0">
                   <div className="flex items-center min-w-0 flex-1 sm:flex-1">
                     <span
