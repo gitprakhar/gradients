@@ -24,6 +24,5 @@ export function logGradientGeneration(
   void supabase
     .from('gradient_generations')
     .insert({ user_query: userQuery, gradient_json: gradientJson })
-    .then(() => {})
-    .catch(() => {})
+    .then(() => {}, () => {})
 }
