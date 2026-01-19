@@ -495,7 +495,7 @@ export function App() {
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={handleInputKeyDown}
                   disabled={isGenerating}
-                  className="h-8 sm:h-6 min-h-0 m-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow outline-none text-gray-800 text-sm font-sans leading-none placeholder:text-gray-600 focus:placeholder:text-gray-600 disabled:opacity-50 max-w-[70vw] sm:max-w-none"
+                  className="h-9 sm:h-6 min-h-0 m-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow outline-none text-gray-800 text-sm font-sans leading-none placeholder:text-gray-600 focus:placeholder:text-gray-600 disabled:opacity-50 max-w-[70vw] sm:max-w-none"
                   onClick={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}
                 />
@@ -529,7 +529,7 @@ export function App() {
                       onChange={(e) => setInputValue(e.target.value)}
                       onKeyDown={handleInputKeyDown}
                       disabled={isGenerating}
-                      className="h-8 sm:h-6 min-h-0 m-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow outline-none text-gray-800 text-sm font-sans leading-none placeholder:text-gray-600 focus:placeholder:text-gray-600 disabled:opacity-50 max-w-[70vw] sm:max-w-full"
+                      className="h-9 sm:h-6 min-h-0 m-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow outline-none text-gray-800 text-sm font-sans leading-none placeholder:text-gray-600 focus:placeholder:text-gray-600 disabled:opacity-50 max-w-[70vw] sm:max-w-full"
                       onClick={(e) => e.stopPropagation()}
                       onMouseDown={(e) => e.stopPropagation()}
                     />
@@ -542,7 +542,13 @@ export function App() {
                     <button
                       type="button"
                       onMouseDown={(e) => e.stopPropagation()}
-                      className="h-8 w-8 min-h-0 min-w-0 m-0 p-0 border-0 bg-white/80 backdrop-blur-xl shadow text-gray-800 flex items-center justify-center hover:opacity-90 transition-opacity appearance-none sm:h-6 sm:w-auto sm:min-w-0 sm:px-2 sm:py-1"
+                      onClick={(e) => {
+                        if (typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches) {
+                          e.stopPropagation()
+                          handleDownload(1080, 1920, '9-16')
+                        }
+                      }}
+                      className="h-9 w-9 min-h-0 min-w-0 m-0 p-0 border-0 bg-white/80 backdrop-blur-xl shadow text-gray-800 flex items-center justify-center hover:opacity-90 transition-opacity appearance-none sm:h-6 sm:w-auto sm:min-w-0 sm:px-2 sm:py-1"
                       aria-label="Download"
                     >
                       <svg className="w-3.5 h-3.5 sm:hidden shrink-0 block self-center" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -554,7 +560,7 @@ export function App() {
                     </button>
                     {downloadOpen && (
                       <div
-                        className="absolute right-0 left-auto sm:left-0 sm:right-auto top-full mt-0 z-50 min-w-[180px] bg-white/80 backdrop-blur-xl shadow py-1"
+                        className="hidden sm:block absolute right-0 left-auto sm:left-0 sm:right-auto top-full mt-0 z-50 min-w-[180px] bg-white/80 backdrop-blur-xl shadow py-1"
                         onMouseDown={(e) => e.stopPropagation()}
                       >
                         {DOWNLOAD_SIZES.map(({ label, width, height, name }) => (
