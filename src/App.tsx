@@ -309,7 +309,6 @@ export function App() {
       }
       setColorStops(preGenerateStopsRef.current)
       const msg = error instanceof Error ? error.message : String(error)
-      console.error('Failed to generate gradient:', error)
       setGenerateError(msg)
     } finally {
       setIsGenerating(false)
@@ -468,6 +467,7 @@ export function App() {
                   ref={inputRef}
                   type="text"
                   autoFocus
+                  enterKeyHint="go"
                   placeholder={placeholderText}
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
@@ -486,10 +486,10 @@ export function App() {
             </div>
           ) : (
             <>
-              {/* Top: input left, download right on mobile; both left on sm+ */}
-              <div className="absolute top-8 left-8 right-8 sm:right-auto sm:max-w-[min(38vw,540px)] space-y-1">
-                <div className="flex items-center justify-between sm:justify-start gap-2 min-w-0">
-                  <div className="flex items-center min-w-0 flex-1">
+              {/* Mobile: centered, input + square download button; sm+: top-left row with "Download" text */}
+              <div className="absolute inset-0 sm:inset-auto sm:top-8 sm:left-8 sm:right-auto sm:bottom-auto sm:max-w-[min(38vw,540px)] flex flex-col items-center justify-center sm:items-stretch sm:justify-start gap-1">
+                <div className="flex flex-row items-center justify-center sm:justify-start gap-2 min-w-0 max-w-[calc(100vw-4rem)] px-4 sm:px-0">
+                  <div className="flex items-center min-w-0 flex-1 sm:flex-1">
                     <span
                       ref={measureRef}
                       className="absolute invisible whitespace-pre text-xs font-sans"
@@ -501,6 +501,7 @@ export function App() {
                       ref={inputRef}
                       type="text"
                       autoFocus
+                      enterKeyHint="go"
                       placeholder={placeholderText}
                       value={inputValue}
                       onChange={(e) => setInputValue(e.target.value)}
@@ -512,16 +513,18 @@ export function App() {
                     />
                   </div>
                   <div
-                    className="relative flex items-center flex-shrink-0"
+                    className="relative flex items-center justify-center flex-shrink-0"
                     onMouseEnter={() => setDownloadOpen(true)}
                     onMouseLeave={() => setDownloadOpen(false)}
                   >
                     <button
                       type="button"
                       onMouseDown={(e) => e.stopPropagation()}
-                      className="h-6 min-h-0 m-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow text-gray-800 text-xs font-sans leading-none hover:opacity-90 transition-opacity appearance-none"
+                      className="h-6 w-6 min-h-0 min-w-0 m-0 p-0 border-0 bg-white/80 backdrop-blur-xl shadow text-gray-800 flex items-center justify-center hover:opacity-90 transition-opacity appearance-none sm:w-auto sm:min-w-0 sm:px-2 sm:py-1"
+                      aria-label="Download"
                     >
-                      Download
+                      <img src="https://img.icons8.com/?size=48&id=14100&format=png&color=000000" alt="" className="w-3.5 h-3.5 sm:hidden object-contain" aria-hidden />
+                      <span className="hidden sm:inline text-xs font-sans leading-none">Download</span>
                     </button>
                     {downloadOpen && (
                       <div

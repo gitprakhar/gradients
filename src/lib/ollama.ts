@@ -83,7 +83,6 @@ Format: [{"color":"#RRGGBB","stop":number}, ...]`
     }
 
     const data = await response.json()
-    console.log('Ollama response:', data)
     let content = data.message?.content || data.content || (typeof data === 'string' ? data : '')
 
     // Strip markdown code blocks if present (common with local models)
@@ -127,9 +126,7 @@ Format: [{"color":"#RRGGBB","stop":number}, ...]`
         .filter((x) => /^#[0-9A-F]{6}$/i.test(x.color))
 
       if (stops.length < 2) throw new Error('Invalid response: Need at least 2 valid color stops')
-      const result = stops.sort((a, b) => a.stop - b.stop)
-      console.log('Ollama gradient stops:', result)
-      return result
+      return stops.sort((a, b) => a.stop - b.stop)
     }
 
     // Legacy: plain hex array → even stops
@@ -144,14 +141,11 @@ Format: [{"color":"#RRGGBB","stop":number}, ...]`
       })
       .filter((s) => /^#[0-9A-F]{6}$/i.test(s))
     if (hexColors.length < 2) throw new Error('Invalid response: Need at least 2 valid hex colors')
-    const result = hexColors.map((color, i) => ({
+    return hexColors.map((color, i) => ({
       color,
       stop: Math.round((i / (hexColors.length - 1)) * 100),
     }))
-    console.log('Ollama gradient stops (legacy):', result)
-    return result
   } catch (error) {
-    console.error('Error generating gradient from Ollama:', error)
     // Friendlier message when local Ollama can't be reached
     if (!OLLAMA_CONFIG.useCloud) {
       const msg = String(error instanceof Error ? error.message : error).toLowerCase()

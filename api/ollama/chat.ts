@@ -33,8 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const data = await response.json().catch(() => ({}))
     res.status(response.status).json(data)
-  } catch (err) {
-    console.error('Ollama proxy error:', err)
+  } catch {
     res.status(502).json({ error: 'Failed to reach Ollama Cloud' })
   }
 }
