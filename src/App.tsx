@@ -131,6 +131,18 @@ export function App() {
   const animationFrameIdRef = useRef<number | null>(null)
   const preGenerateStopsRef = useRef<{ position: number; color: string }[]>([])
 
+  // On mobile: color strip starts below the top bar (input + download). sm (640px) = desktop.
+  const [topMargin, setTopMargin] = useState(() =>
+    typeof window !== 'undefined' && !window.matchMedia('(min-width: 640px)').matches ? 72 : 32
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 640px)')
+    const update = () => setTopMargin(mq.matches ? 32 : 72)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
+
   useEffect(() => { colorStopsRef.current = colorStops }, [colorStops])
   useEffect(() => () => {
     if (animationFrameIdRef.current != null) cancelAnimationFrame(animationFrameIdRef.current)
@@ -171,10 +183,9 @@ export function App() {
     
     const rect = pageRef.current.getBoundingClientRect()
     const y = e.clientY - rect.top
-    const TOP_MARGIN = 32 // Match top-8 (2rem) where text is
-    const BOTTOM_MARGIN = 32 // Same as top margin
-    const availableHeight = rect.height - TOP_MARGIN - BOTTOM_MARGIN
-    const relativeY = y - TOP_MARGIN
+    const BOTTOM_MARGIN = 32
+    const availableHeight = rect.height - topMargin - BOTTOM_MARGIN
+    const relativeY = y - topMargin
     // Constrain to 0-100% within the available area (between margins)
     const percentage = Math.max(0, Math.min(100, (relativeY / availableHeight) * 100))
     
@@ -319,10 +330,9 @@ export function App() {
       
       const rect = pageRef.current.getBoundingClientRect()
       const y = e.clientY - rect.top
-      const TOP_MARGIN = 32 // Match top-8 (2rem) where text is
-      const BOTTOM_MARGIN = 32 // Same as top margin
-      const availableHeight = rect.height - TOP_MARGIN - BOTTOM_MARGIN
-      const relativeY = y - TOP_MARGIN
+      const BOTTOM_MARGIN = 32
+      const availableHeight = rect.height - topMargin - BOTTOM_MARGIN
+      const relativeY = y - topMargin
       // Constrain to 0-100% within the available area (between margins)
       const percentage = Math.max(0, Math.min(100, (relativeY / availableHeight) * 100))
       
@@ -344,7 +354,7 @@ export function App() {
         window.removeEventListener('mouseup', handleMouseUp)
       }
     }
-  }, [dragging, colorStops])
+  }, [dragging, colorStops, topMargin])
 
   const handleDownload = (width: number, height: number, aspectRatioName: string) => {
     // Create a canvas with specified aspect ratio
@@ -399,7 +409,6 @@ export function App() {
     const rect = pageRef.current.getBoundingClientRect()
     const y = e.clientY - rect.top
     const x = e.clientX - rect.left
-    const TOP_MARGIN = 32
     const BOTTOM_MARGIN = 32
     const pageHeight = rect.height
 
@@ -423,7 +432,7 @@ export function App() {
     }
     
     // Show plus in the full gradient strip: above, between, and below the buttons
-    const inGradientStrip = y >= TOP_MARGIN && y <= pageHeight - BOTTOM_MARGIN
+    const inGradientStrip = y >= topMargin && y <= pageHeight - BOTTOM_MARGIN
     setShowPlusCursor(inGradientStrip)
   }
 
@@ -545,20 +554,19 @@ export function App() {
 
               {/* Render all color stops as buttons */}
               {colorStops.map((stop, index) => {
-            const TOP_MARGIN = 32 // Match top-8 (2rem) where text is
-            const BOTTOM_MARGIN = 32 // Same as top margin
+            const BOTTOM_MARGIN = 32
             const pageHeight = pageRef.current?.clientHeight || window.innerHeight
-            const availableHeight = pageHeight - TOP_MARGIN - BOTTOM_MARGIN
+            const availableHeight = pageHeight - topMargin - BOTTOM_MARGIN
             
             // For position 100, use bottom instead of top to prevent going off screen
             const isBottom = stop.position === 100
-            const topPx = TOP_MARGIN + (stop.position / 100) * availableHeight
+            const topPx = topMargin + (stop.position / 100) * availableHeight
             
             return (
               <div
                 key={index}
                 ref={(el) => { stopContainerRefs.current[index] = el }}
-                className={`absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5 ${colorPickerFor === index ? 'z-[100]' : 'z-10'}`}
+                className={`absolute left-8 sm:left-1/2 sm:-translate-x-1/2 flex items-center gap-1.5 ${colorPickerFor === index ? 'z-[100]' : 'z-10'}`}
                 style={{ 
                   ...(isBottom 
                     ? { bottom: `${BOTTOM_MARGIN}px` }
@@ -596,7 +604,7 @@ export function App() {
                   </div>
                   
                   {/* Hex code — rest of pill is for drag */}
-                  <span className="text-xs font-mono text-gray-800">
+                  <span className="text-xs font-sans leading-none text-gray-800">
                     {stop.color.toUpperCase()}
                   </span>
 
@@ -616,7 +624,7 @@ export function App() {
                     type="button"
                     onMouseDown={(e) => e.stopPropagation()}
                     onClick={handleRemoveStop(index)}
-                    className="w-6 h-6 flex items-center justify-center flex-shrink-0 bg-white/80 backdrop-blur-xl shadow rounded-none text-gray-800 text-lg leading-none hover:opacity-70 transition-opacity cursor-pointer"
+                    className="w-6 h-6 flex items-center justify-center flex-shrink-0 bg-white/80 backdrop-blur-xl shadow rounded-none text-gray-800 text-xs font-sans leading-none hover:opacity-70 transition-opacity cursor-pointer"
                   >
                     −
                   </button>
