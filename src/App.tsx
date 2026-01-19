@@ -78,6 +78,7 @@ export function App() {
   const [inputValue, setInputValue] = useState('')
   const [placeholderText, setPlaceholderText] = useState(initialPresetRef.current!.title)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [generateError, setGenerateError] = useState<string | null>(null)
   const [downloadOpen, setDownloadOpen] = useState(false)
   const [colorPickerFor, setColorPickerFor] = useState<number | null>(null)
   const [pickerPlaceAbove, setPickerPlaceAbove] = useState(false)
@@ -192,6 +193,7 @@ export function App() {
       cancelAnimationFrame(animationFrameIdRef.current)
       animationFrameIdRef.current = null
     }
+    setGenerateError(null)
     setIsGenerating(true)
     try {
       const stops = await generateGradientFromPrompt(prompt)
@@ -227,7 +229,9 @@ export function App() {
       animationFrameIdRef.current = requestAnimationFrame(animate)
       setPlaceholderText(prompt)
     } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error)
       console.error('Failed to generate gradient:', error)
+      setGenerateError(msg)
     } finally {
       setIsGenerating(false)
     }
@@ -365,7 +369,8 @@ export function App() {
       onMouseLeave={() => setShowPlusCursor(false)}
     >
           {/* Top: input left, download right on mobile; both left on sm+ */}
-          <div className="absolute top-8 left-8 right-8 sm:right-auto flex items-center justify-between sm:justify-start gap-2">
+          <div className="absolute top-8 left-8 right-8 sm:right-auto space-y-1">
+            <div className="flex items-center justify-between sm:justify-start gap-2">
             <div className="flex items-center">
               <span
                 ref={measureRef}
@@ -422,6 +427,12 @@ export function App() {
                 </div>
               )}
             </div>
+            </div>
+            {generateError && (
+              <p className="text-xs font-sans text-red-600 mt-0.5" role="alert">
+                {generateError}
+              </p>
+            )}
           </div>
 
           {/* Render all color stops as buttons */}

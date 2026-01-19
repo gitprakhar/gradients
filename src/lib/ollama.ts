@@ -47,8 +47,11 @@ Format: [{"color":"#RRGGBB","stop":number}, ...]`
       headers['Authorization'] = `Bearer ${OLLAMA_CONFIG.apiKey}`
     }
 
-    const chatPath = OLLAMA_CONFIG.useCloud ? '/chat' : '/api/chat'
-    const url = `${OLLAMA_CONFIG.baseUrl}${chatPath}`
+    // Cloud: /api/ollama + /chat (unchanged)
+    // Local: Ollama docs — POST http://localhost:11434/api/chat (no /api-local, no proxy path)
+    const url = OLLAMA_CONFIG.useCloud
+      ? `${OLLAMA_CONFIG.baseUrl}/chat`
+      : 'http://localhost:11434/api/chat'
 
     const response = await fetch(url, {
       method: 'POST',
@@ -81,21 +84,19 @@ Format: [{"color":"#RRGGBB","stop":number}, ...]`
 
     const data = await response.json()
     console.log('Ollama response:', data)
-    // Handle different response structures from Ollama
-    const content = data.message?.content || data.content || (typeof data === 'string' ? data : '')
-    
-    // Parse the JSON array from the response
-    // Try to extract JSON array from the response (handles multiline and escaped quotes)
-    let jsonMatch = content.match(/\[[\s\S]*?\]/)
+    let content = data.message?.content || data.content || (typeof data === 'string' ? data : '')
+
+    // Strip markdown code blocks if present (common with local models)
+    const codeBlock = content.match(/```(?:json)?\s*([\s\S]*?)```/)
+    if (codeBlock) content = codeBlock[1].trim()
+
+    // Extract JSON array: use greedy match so we get the full [...] (non-greedy can cut at the first ] inside)
+    let jsonMatch = content.match(/\[[\s\S]*\]/)
     if (!jsonMatch) {
-      // If no array found, try to parse the whole content
       const trimmed = content.trim()
-      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-        jsonMatch = [trimmed]
-      } else {
-        throw new Error('Could not find JSON array in Ollama response')
-      }
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) jsonMatch = [trimmed]
     }
+    if (!jsonMatch) throw new Error('Could not find JSON array in Ollama response')
 
     let parsed: unknown
     try {
@@ -151,6 +152,20 @@ Format: [{"color":"#RRGGBB","stop":number}, ...]`
     return result
   } catch (error) {
     console.error('Error generating gradient from Ollama:', error)
+    // Friendlier message when local Ollama can't be reached
+    if (!OLLAMA_CONFIG.useCloud) {
+      const msg = String(error instanceof Error ? error.message : error).toLowerCase()
+      if (error instanceof TypeError || /failed to fetch|network|load failed|connection refused/i.test(msg)) {
+        throw new Error(
+          'Cannot reach Ollama. Is it running? Run `ollama serve` and pull a model (e.g. `ollama pull phi3`). If you use another model, set VITE_OLLAMA_MODEL in .env.local.'
+        )
+      }
+      if (/model.*not found|not found.*model|404/i.test(msg)) {
+        throw new Error(
+          `Model "${OLLAMA_CONFIG.model}" not found. Run \`ollama pull ${OLLAMA_CONFIG.model}\` or set VITE_OLLAMA_MODEL in .env.local to a model you have (e.g. llama3.2:latest).`
+        )
+      }
+    }
     throw error
   }
 }

@@ -21,11 +21,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/ollama/, '/api'),
       },
-      // Local Ollama: avoid CORS by proxying /api/ollama-local -> http://localhost:11434
+      // Local Ollama: avoid CORS by proxying to http://localhost:11434
       '/api/ollama-local': {
         target: 'http://localhost:11434',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/ollama-local/, ''),
+        rewrite: (p) => p.replace(/^\/api\/ollama-local/, ''),
       },
     },
   },
