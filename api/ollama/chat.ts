@@ -4,7 +4,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
  * Proxies POST /api/ollama/chat to Ollama Cloud (https://ollama.com/api/chat).
  * Adds OLLAMA_API_KEY server-side so it is not exposed to the client.
  *
- * On Vercel, set: OLLAMA_API_KEY, VITE_OLLAMA_USE_CLOUD=true, VITE_OLLAMA_MODEL (optional)
+ * On Vercel, set: OLLAMA_API_KEY, VITE_OLLAMA_USE_CLOUD=true, VITE_OLLAMA_USE_PROXY=true, VITE_OLLAMA_MODEL (optional)
  * Do not set VITE_OLLAMA_API_KEY when using this proxy.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {

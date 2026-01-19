@@ -1,10 +1,10 @@
 // Ollama API configuration
 // - Local: copy .env.example to .env.local. For cloud: VITE_OLLAMA_USE_CLOUD=true, VITE_OLLAMA_API_KEY=...
 //   For local Ollama: leave VITE_OLLAMA_USE_CLOUD unset, run Ollama. Vite proxies /api/ollama-local to avoid CORS.
-// - Vercel: VITE_OLLAMA_USE_CLOUD=true, VITE_OLLAMA_SERVER_ADDS_AUTH=true, OLLAMA_API_KEY=<key>, VITE_OLLAMA_MODEL (optional)
+// - Vercel: VITE_OLLAMA_USE_CLOUD=true, VITE_OLLAMA_USE_PROXY=true, OLLAMA_API_KEY=<key>, VITE_OLLAMA_MODEL (optional)
 
 const useCloud = import.meta.env.VITE_OLLAMA_USE_CLOUD === 'true'
-const serverAddsAuth = import.meta.env.VITE_OLLAMA_SERVER_ADDS_AUTH === 'true'
+const serverAddsAuth = import.meta.env.VITE_OLLAMA_USE_PROXY === 'true'
 
 export const OLLAMA_CONFIG = {
   useCloud,
