@@ -486,7 +486,7 @@ export function App() {
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={handleInputKeyDown}
                   disabled={isGenerating}
-                  className="h-6 min-h-0 m-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow outline-none text-gray-800 text-sm font-sans leading-none placeholder:text-gray-600 focus:placeholder:text-gray-600 disabled:opacity-50"
+                  className="h-8 sm:h-6 min-h-0 m-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow outline-none text-gray-800 text-sm font-sans leading-none placeholder:text-gray-600 focus:placeholder:text-gray-600 disabled:opacity-50"
                   onClick={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}
                 />
@@ -520,7 +520,7 @@ export function App() {
                       onChange={(e) => setInputValue(e.target.value)}
                       onKeyDown={handleInputKeyDown}
                       disabled={isGenerating}
-                      className="h-6 min-h-0 m-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow outline-none text-gray-800 text-sm font-sans leading-none placeholder:text-gray-600 focus:placeholder:text-gray-600 disabled:opacity-50 max-w-full"
+                      className="h-8 sm:h-6 min-h-0 m-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow outline-none text-gray-800 text-sm font-sans leading-none placeholder:text-gray-600 focus:placeholder:text-gray-600 disabled:opacity-50 max-w-full"
                       onClick={(e) => e.stopPropagation()}
                       onMouseDown={(e) => e.stopPropagation()}
                     />
@@ -533,7 +533,7 @@ export function App() {
                     <button
                       type="button"
                       onMouseDown={(e) => e.stopPropagation()}
-                      className="h-6 w-6 min-h-0 min-w-0 m-0 p-0 border-0 bg-white/80 backdrop-blur-xl shadow text-gray-800 flex items-center justify-center hover:opacity-90 transition-opacity appearance-none sm:w-auto sm:min-w-0 sm:px-2 sm:py-1"
+                      className="h-8 w-8 min-h-0 min-w-0 m-0 p-0 border-0 bg-white/80 backdrop-blur-xl shadow text-gray-800 flex items-center justify-center hover:opacity-90 transition-opacity appearance-none sm:h-6 sm:w-auto sm:min-w-0 sm:px-2 sm:py-1"
                       aria-label="Download"
                     >
                       <svg className="w-3.5 h-3.5 sm:hidden shrink-0 block self-center" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
