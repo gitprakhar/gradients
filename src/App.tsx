@@ -86,7 +86,7 @@ const DOWNLOAD_SIZES = [
 const PRESET_GRADIENTS: { title: string; stops: { color: string; stop: number }[] }[] = [
   { title: 'Golden hour', stops: [{ color: '#b38117', stop: 0 }, { color: '#deae3a', stop: 30 }, { color: '#ffd265', stop: 60 }, { color: '#fff8c0', stop: 100 }] },
   { title: 'Pink clouds at sunset', stops: [{ color: '#ffd1dc', stop: 0 }, { color: '#ffb6a4', stop: 60 }, { color: '#ff8a55', stop: 100 }] },
-  { title: 'Moss covered forest', stops: [{ color: '#1b2d1f', stop: 0 }, { color: '#2e4d3f', stop: 30 }, { color: '#5e8a5e', stop: 70 }, { color: '#8a6b3d', stop: 100 }] },
+  { title: 'What Mars would look like', stops: [{ color: '#A52A2A', stop: 0 }, { color: '#FF6B0F', stop: 50 }, { color: '#E6B07C', stop: 100 }] },
   { title: 'Kind of blue', stops: [{ color: '#cce7ff', stop: 0 }, { color: '#a5ccef', stop: 60 }, { color: '#5f8dd5', stop: 100 }] },
   { title: 'Cherry blossoms in spring', stops: [{ color: '#fff0f6', stop: 0 }, { color: '#f4b8c4', stop: 33 }, { color: '#eb6d95', stop: 66 }, { color: '#c03e6a', stop: 100 }] },
   { title: 'Winter evening glow', stops: [{ color: '#0a1128', stop: 0 }, { color: '#e6ac53', stop: 60 }, { color: '#ffdfc7', stop: 100 }] },
