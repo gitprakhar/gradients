@@ -71,3 +71,24 @@ export default defineConfig([
   },
 ])
 ```
+
+## Deploying to Vercel (gradient AI)
+
+For the **generate gradient** feature to work in production:
+
+1. In [Vercel Project Settings → Environment Variables](https://vercel.com/docs/projects/environment-variables), add:
+   - **`VITE_OLLAMA_USE_CLOUD`** = `true`
+   - **`VITE_OLLAMA_SERVER_ADDS_AUTH`** = `true` (so the client does not need the key; the serverless adds it)
+   - **`OLLAMA_API_KEY`** = your [Ollama Cloud](https://ollama.com) API key (server-only; never use a `VITE_` prefix for this)
+   - **`VITE_OLLAMA_MODEL`** = `gpt-oss:20b-cloud` (optional; this is the default for cloud)
+
+2. Do **not** set `VITE_OLLAMA_API_KEY` on Vercel. The `api/ollama/chat` serverless function adds the key on the server.
+
+3. Redeploy after changing env vars.
+
+**Local development:**
+
+- **Local Ollama:** Run `ollama serve` and pull a model (e.g. `ollama pull phi3`). Leave `VITE_OLLAMA_USE_CLOUD` unset. Vite proxies `/api/ollama-local` to `http://localhost:11434` to avoid CORS.
+- **Ollama Cloud (local):** In `.env.local` set `VITE_OLLAMA_USE_CLOUD=true` and `VITE_OLLAMA_API_KEY=your_key`. Do **not** set `VITE_OLLAMA_SERVER_ADDS_AUTH`; that is only for Vercel.
+
+See `.env.example` for all options.

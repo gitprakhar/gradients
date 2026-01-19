@@ -1,15 +1,17 @@
 // Ollama API configuration
-// Create a .env.local file in the root directory with:
-// VITE_OLLAMA_USE_CLOUD=true (set to true for cloud, false or omit for local)
-// VITE_OLLAMA_API_KEY=your_api_key_here (required for cloud, optional for local)
-// VITE_OLLAMA_BASE_URL (auto-set: cloud=/api/ollama for Vite proxy, local=http://localhost:11434; override only if you have your own backend)
-// VITE_OLLAMA_MODEL=gpt-oss:20b-cloud (cloud model) or deepseek-r1:7b (local model)
+// - Local: copy .env.example to .env.local. For cloud: VITE_OLLAMA_USE_CLOUD=true, VITE_OLLAMA_API_KEY=...
+//   For local Ollama: leave VITE_OLLAMA_USE_CLOUD unset, run Ollama. Vite proxies /api/ollama-local to avoid CORS.
+// - Vercel: VITE_OLLAMA_USE_CLOUD=true, VITE_OLLAMA_SERVER_ADDS_AUTH=true, OLLAMA_API_KEY=<key>, VITE_OLLAMA_MODEL (optional)
 
 const useCloud = import.meta.env.VITE_OLLAMA_USE_CLOUD === 'true'
+const serverAddsAuth = import.meta.env.VITE_OLLAMA_SERVER_ADDS_AUTH === 'true'
 
 export const OLLAMA_CONFIG = {
   useCloud,
+  serverAddsAuth,
   apiKey: import.meta.env.VITE_OLLAMA_API_KEY || '',
-  baseUrl: import.meta.env.VITE_OLLAMA_BASE_URL || (useCloud ? '/api/ollama' : 'http://localhost:11434'),
+  baseUrl:
+    import.meta.env.VITE_OLLAMA_BASE_URL ||
+    (useCloud ? '/api/ollama' : '/api/ollama-local'),
   model: import.meta.env.VITE_OLLAMA_MODEL || (useCloud ? 'gpt-oss:20b-cloud' : 'phi3:latest'),
 }

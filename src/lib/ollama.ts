@@ -31,9 +31,11 @@ Return ONLY valid JSON. No markdown, no explanation.
 Format: [{"color":"#RRGGBB","stop":number}, ...]`
 
   try {
-    // Require API key when using cloud
-    if (OLLAMA_CONFIG.useCloud && !OLLAMA_CONFIG.apiKey) {
-      throw new Error('API key is required when using Ollama Cloud. Please set VITE_OLLAMA_API_KEY in .env.local')
+    // When useCloud: require API key unless our server adds it (Vercel: VITE_OLLAMA_SERVER_ADDS_AUTH=true)
+    if (OLLAMA_CONFIG.useCloud && !OLLAMA_CONFIG.apiKey && !OLLAMA_CONFIG.serverAddsAuth) {
+      throw new Error(
+        'API key is required for Ollama Cloud. Set VITE_OLLAMA_API_KEY in .env.local (or OLLAMA_API_KEY on the server and VITE_OLLAMA_SERVER_ADDS_AUTH=true on Vercel).'
+      )
     }
 
     const headers: HeadersInit = {
