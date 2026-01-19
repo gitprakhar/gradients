@@ -149,6 +149,14 @@ export function App() {
     if (animationFrameIdRef.current != null) cancelAnimationFrame(animationFrameIdRef.current)
   }, [])
 
+  // Keep cursor as grabbing for the whole drag, even when mouse moves over other elements
+  useEffect(() => {
+    if (dragging !== null) {
+      document.body.style.setProperty('cursor', 'grabbing', 'important')
+      return () => { document.body.style.removeProperty('cursor') }
+    }
+  }, [dragging])
+
   // Close color picker when mousedown outside the pill
   useEffect(() => {
     if (colorPickerFor === null) return
@@ -445,7 +453,7 @@ export function App() {
       className="w-full h-full min-h-0 relative overflow-hidden" 
       style={{
         background: gradientString(),
-        cursor: hasCompletedFirstGeneration && showPlusCursor ? `url("${plusCursor}") 12 12, crosshair` : 'default'
+        cursor: dragging !== null ? 'grabbing' : (hasCompletedFirstGeneration && showPlusCursor ? `url("${plusCursor}") 12 12, crosshair` : 'default')
       }}
       onClick={handleLineClick}
       onMouseMove={handlePageMouseMove}
