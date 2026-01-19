@@ -184,6 +184,15 @@ export function App() {
     }
   }, [inputValue, placeholderText])
 
+  // On mobile, when switching to the main view after generation, show the start of long prompts
+  useEffect(() => {
+    if (!hasCompletedFirstGeneration) return
+    const el = inputRef.current
+    if (!el || (typeof window !== 'undefined' && !window.matchMedia('(max-width: 639px)').matches)) return
+    const id = requestAnimationFrame(() => { el.scrollLeft = 0 })
+    return () => cancelAnimationFrame(id)
+  }, [hasCompletedFirstGeneration])
+
   const handleLineClick = (e: React.MouseEvent) => {
     if (!hasCompletedFirstGeneration) return
     if (!pageRef.current || dragging !== null) return
@@ -462,9 +471,9 @@ export function App() {
       onMouseLeave={() => setShowPlusCursor(false)}
     >
           {!hasCompletedFirstGeneration ? (
-            /* Landing: gradient + input only; on mobile at bottom, on desktop centered */
+            /* Landing: gradient + centered input only; no download, no color pills */
             <div
-              className="absolute inset-0 flex flex-col items-center justify-end sm:justify-center pb-6 sm:pb-0"
+              className="absolute inset-0 flex items-center justify-center"
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
             >
@@ -500,7 +509,7 @@ export function App() {
           ) : (
             <>
               {/* Mobile: input + download at bottom; sm+: top-left row with "Download" text */}
-              <div className="absolute inset-0 sm:inset-auto sm:top-8 sm:left-8 sm:right-auto sm:bottom-auto sm:max-w-[min(48vw,1100px)] flex flex-col items-center justify-end sm:items-stretch sm:justify-start gap-1 pb-6 sm:pb-0">
+              <div className="absolute inset-0 sm:inset-auto sm:top-8 sm:left-8 sm:right-auto sm:bottom-auto sm:max-w-[min(48vw,1100px)] flex flex-col items-center justify-end sm:items-stretch sm:justify-start gap-1 pb-10 sm:pb-0">
                 <div className="flex flex-row items-center justify-center sm:justify-start gap-2 min-w-0 max-w-[calc(100vw-4rem)] px-4 sm:px-0">
                   <div className="flex items-center min-w-0 flex-1 sm:flex-1">
                     <span
