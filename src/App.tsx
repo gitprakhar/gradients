@@ -117,6 +117,7 @@ export function App() {
   const [placeholderText, setPlaceholderText] = useState(initialPresetRef.current!.title)
   const [isGenerating, setIsGenerating] = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
+  const [hasCompletedFirstGeneration, setHasCompletedFirstGeneration] = useState(false)
   const [downloadOpen, setDownloadOpen] = useState(false)
   const [colorPickerFor, setColorPickerFor] = useState<number | null>(null)
   const [pickerPlaceAbove, setPickerPlaceAbove] = useState(false)
@@ -159,6 +160,7 @@ export function App() {
   }, [inputValue, placeholderText])
 
   const handleLineClick = (e: React.MouseEvent) => {
+    if (!hasCompletedFirstGeneration) return
     if (!pageRef.current || dragging !== null) return
     
     // Only create new stop if plus cursor is showing
@@ -255,6 +257,7 @@ export function App() {
 
     try {
       const stops = await generateGradientFromPrompt(prompt)
+      setHasCompletedFirstGeneration(true)
       if (animationFrameIdRef.current != null) {
         cancelAnimationFrame(animationFrameIdRef.current)
         animationFrameIdRef.current = null
@@ -384,6 +387,10 @@ export function App() {
   }
 
   const handlePageMouseMove = (e: React.MouseEvent) => {
+    if (!hasCompletedFirstGeneration) {
+      setShowPlusCursor(false)
+      return
+    }
     if (!pageRef.current || dragging !== null) {
       setShowPlusCursor(false)
       return
@@ -426,81 +433,118 @@ export function App() {
       className="w-screen h-screen relative" 
       style={{
         background: gradientString(),
-        cursor: showPlusCursor ? `url("${plusCursor}") 12 12, crosshair` : 'default'
+        cursor: hasCompletedFirstGeneration && showPlusCursor ? `url("${plusCursor}") 12 12, crosshair` : 'default'
       }}
       onClick={handleLineClick}
       onMouseMove={handlePageMouseMove}
       onMouseLeave={() => setShowPlusCursor(false)}
     >
-          {/* Top: input left, download right on mobile; both left on sm+ */}
-          <div className="absolute top-8 left-8 right-8 sm:right-auto space-y-1">
-            <div className="flex items-center justify-between sm:justify-start gap-2">
-            <div className="flex items-center">
-              <span
-                ref={measureRef}
-                className="absolute invisible whitespace-pre text-xs font-sans"
-                style={{ visibility: 'hidden', position: 'absolute' }}
-              >
-                {placeholderText}
-              </span>
-              <input
-                ref={inputRef}
-                type="text"
-                autoFocus
-                placeholder={placeholderText}
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleInputKeyDown}
-                disabled={isGenerating}
-                className="h-6 min-h-0 m-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow outline-none text-gray-800 text-xs font-sans leading-none placeholder:text-gray-600 focus:placeholder:text-gray-600 disabled:opacity-50"
-                onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-              />
-            </div>
+          {!hasCompletedFirstGeneration ? (
+            /* Landing: gradient + centered input only; no download, no color pills */
             <div
-              className="relative flex items-center"
-              onMouseEnter={() => setDownloadOpen(true)}
-              onMouseLeave={() => setDownloadOpen(false)}
+              className="absolute inset-0 flex items-center justify-center"
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
             >
-              <button
-                type="button"
-                onMouseDown={(e) => e.stopPropagation()}
-                className="h-6 min-h-0 m-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow text-gray-800 text-xs font-sans leading-none hover:opacity-90 transition-opacity appearance-none"
-              >
-                Download
-              </button>
-              {downloadOpen && (
-                <div
-                  className="absolute right-0 left-auto sm:left-0 sm:right-auto top-full mt-0 z-50 min-w-[180px] bg-white/80 backdrop-blur-xl shadow py-1"
-                  onMouseDown={(e) => e.stopPropagation()}
+              <div className="flex flex-col items-center gap-2">
+                <span
+                  ref={measureRef}
+                  className="absolute invisible whitespace-pre text-xs font-sans"
+                  style={{ visibility: 'hidden', position: 'absolute' }}
                 >
-                  {DOWNLOAD_SIZES.map(({ label, width, height, name }) => (
-                    <button
-                      key={name}
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDownload(width, height, name)
-                        setDownloadOpen(false)
-                      }}
-                      className="w-full text-left px-3 py-1.5 text-xs font-sans text-gray-800 hover:bg-gray-100"
+                  {placeholderText}
+                </span>
+                <input
+                  ref={inputRef}
+                  type="text"
+                  autoFocus
+                  placeholder={placeholderText}
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={handleInputKeyDown}
+                  disabled={isGenerating}
+                  className="h-6 min-h-0 m-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow outline-none text-gray-800 text-xs font-sans leading-none placeholder:text-gray-600 focus:placeholder:text-gray-600 disabled:opacity-50"
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                />
+                {generateError && (
+                  <p className="text-xs font-sans text-red-600 mt-0.5" role="alert">
+                    {generateError}
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Top: input left, download right on mobile; both left on sm+ */}
+              <div className="absolute top-8 left-8 right-8 sm:right-auto space-y-1">
+                <div className="flex items-center justify-between sm:justify-start gap-2">
+                  <div className="flex items-center">
+                    <span
+                      ref={measureRef}
+                      className="absolute invisible whitespace-pre text-xs font-sans"
+                      style={{ visibility: 'hidden', position: 'absolute' }}
                     >
-                      {label}
+                      {placeholderText}
+                    </span>
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      autoFocus
+                      placeholder={placeholderText}
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      onKeyDown={handleInputKeyDown}
+                      disabled={isGenerating}
+                      className="h-6 min-h-0 m-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow outline-none text-gray-800 text-xs font-sans leading-none placeholder:text-gray-600 focus:placeholder:text-gray-600 disabled:opacity-50"
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                  <div
+                    className="relative flex items-center"
+                    onMouseEnter={() => setDownloadOpen(true)}
+                    onMouseLeave={() => setDownloadOpen(false)}
+                  >
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      className="h-6 min-h-0 m-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow text-gray-800 text-xs font-sans leading-none hover:opacity-90 transition-opacity appearance-none"
+                    >
+                      Download
                     </button>
-                  ))}
+                    {downloadOpen && (
+                      <div
+                        className="absolute right-0 left-auto sm:left-0 sm:right-auto top-full mt-0 z-50 min-w-[180px] bg-white/80 backdrop-blur-xl shadow py-1"
+                        onMouseDown={(e) => e.stopPropagation()}
+                      >
+                        {DOWNLOAD_SIZES.map(({ label, width, height, name }) => (
+                          <button
+                            key={name}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDownload(width, height, name)
+                              setDownloadOpen(false)
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-xs font-sans text-gray-800 hover:bg-gray-100"
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
-            </div>
-            {generateError && (
-              <p className="text-xs font-sans text-red-600 mt-0.5" role="alert">
-                {generateError}
-              </p>
-            )}
-          </div>
+                {generateError && (
+                  <p className="text-xs font-sans text-red-600 mt-0.5" role="alert">
+                    {generateError}
+                  </p>
+                )}
+              </div>
 
-          {/* Render all color stops as buttons */}
-          {colorStops.map((stop, index) => {
+              {/* Render all color stops as buttons */}
+              {colorStops.map((stop, index) => {
             const TOP_MARGIN = 32 // Match top-8 (2rem) where text is
             const BOTTOM_MARGIN = 32 // Same as top margin
             const pageHeight = pageRef.current?.clientHeight || window.innerHeight
@@ -580,6 +624,8 @@ export function App() {
               </div>
             )
           })}
+            </>
+          )}
     </div>
   )
 }
