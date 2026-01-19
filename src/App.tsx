@@ -90,6 +90,7 @@ const PRESET_GRADIENTS: { title: string; stops: { color: string; stop: number }[
   { title: 'Kind of blue', stops: [{ color: '#cce7ff', stop: 0 }, { color: '#a5ccef', stop: 60 }, { color: '#5f8dd5', stop: 100 }] },
   { title: 'Cherry blossoms in spring', stops: [{ color: '#fff0f6', stop: 0 }, { color: '#f4b8c4', stop: 33 }, { color: '#eb6d95', stop: 66 }, { color: '#c03e6a', stop: 100 }] },
   { title: 'Winter evening glow', stops: [{ color: '#0a1128', stop: 0 }, { color: '#e6ac53', stop: 60 }, { color: '#ffdfc7', stop: 100 }] },
+  { title: 'Deep dark forest', stops: [{ color: '#0B1A0C', stop: 0 }, { color: '#1B4B29', stop: 50 }, { color: '#356B3A', stop: 100 }] },
 ]
 
 function pickRandomPreset() {
