@@ -486,7 +486,7 @@ export function App() {
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={handleInputKeyDown}
                   disabled={isGenerating}
-                  className="h-8 sm:h-6 min-h-0 m-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow outline-none text-gray-800 text-sm font-sans leading-none placeholder:text-gray-600 focus:placeholder:text-gray-600 disabled:opacity-50"
+                  className="h-8 sm:h-6 min-h-0 m-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow outline-none text-gray-800 text-sm font-sans leading-none placeholder:text-gray-600 focus:placeholder:text-gray-600 disabled:opacity-50 max-w-[70vw] sm:max-w-none"
                   onClick={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}
                 />
@@ -520,7 +520,7 @@ export function App() {
                       onChange={(e) => setInputValue(e.target.value)}
                       onKeyDown={handleInputKeyDown}
                       disabled={isGenerating}
-                      className="h-8 sm:h-6 min-h-0 m-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow outline-none text-gray-800 text-sm font-sans leading-none placeholder:text-gray-600 focus:placeholder:text-gray-600 disabled:opacity-50 max-w-full"
+                      className="h-8 sm:h-6 min-h-0 m-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow outline-none text-gray-800 text-sm font-sans leading-none placeholder:text-gray-600 focus:placeholder:text-gray-600 disabled:opacity-50 max-w-[70vw] sm:max-w-full"
                       onClick={(e) => e.stopPropagation()}
                       onMouseDown={(e) => e.stopPropagation()}
                     />
