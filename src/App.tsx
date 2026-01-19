@@ -79,7 +79,6 @@ export function App() {
   const [placeholderText, setPlaceholderText] = useState(initialPresetRef.current!.title)
   const [isGenerating, setIsGenerating] = useState(false)
   const [downloadOpen, setDownloadOpen] = useState(false)
-  const [showDownload, setShowDownload] = useState(false)
   const [colorPickerFor, setColorPickerFor] = useState<number | null>(null)
   const [pickerPlaceAbove, setPickerPlaceAbove] = useState(false)
   const pillRefs = useRef<(HTMLDivElement | null)[]>([])
@@ -144,7 +143,6 @@ export function App() {
     const newStops = [...colorStops, { position: newPosition, color: newColor }]
     newStops.sort((a, b) => a.position - b.position)
     setColorStops(newStops)
-    setShowDownload(true)
   }
 
   const interpolateColor = (position: number) => {
@@ -164,7 +162,6 @@ export function App() {
     const newStops = [...colorStops]
     newStops[index].color = color
     setColorStops(newStops)
-    setShowDownload(true)
   }
 
   const handleCircleMouseDown = (index: number) => (e: React.MouseEvent) => {
@@ -185,7 +182,6 @@ export function App() {
 
     const newStops = colorStops.filter((_, i) => i !== index)
     setColorStops(newStops)
-    setShowDownload(true)
   }
 
   const handleGenerateGradient = async () => {
@@ -229,7 +225,6 @@ export function App() {
         }
       }
       animationFrameIdRef.current = requestAnimationFrame(animate)
-      setShowDownload(true)
       setPlaceholderText(prompt)
     } catch (error) {
       console.error('Failed to generate gradient:', error)
@@ -263,7 +258,6 @@ export function App() {
       const newStops = [...colorStops]
       newStops[dragging].position = Math.round(percentage)
       setColorStops(newStops)
-      setShowDownload(true)
     }
 
     const handleMouseUp = () => {
