@@ -14,16 +14,12 @@ CREATE TABLE IF NOT EXISTS public.gradient_generations (
   gradient_json jsonb NOT NULL
 );
 
--- Allow the app (anon key) to insert. Tables created via SQL have RLS off by
--- default, so inserts work without this. Run the block below only if you turn
--- on RLS and then get "new row violates row-level security":
+-- Allow the app (anon key) to insert and select. Tables created via SQL have RLS off
+-- by default. If you enable RLS, run (adjust/merge with any existing policies):
 --
 -- ALTER TABLE public.gradient_generations ENABLE ROW LEVEL SECURITY;
--- CREATE POLICY "Allow anon insert"
---   ON public.gradient_generations
---   FOR INSERT
---   TO anon
---   WITH CHECK (true);
+-- CREATE POLICY "Allow anon insert" ON public.gradient_generations FOR INSERT TO anon WITH CHECK (true);
+-- CREATE POLICY "Allow anon select" ON public.gradient_generations FOR SELECT TO anon USING (true);
 
 -- =============================================================================
 -- Alternative: create via Table Editor (no SQL)

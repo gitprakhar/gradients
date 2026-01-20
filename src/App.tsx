@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { HexColorPicker } from 'react-colorful'
 import { generateGradientFromPrompt } from "@/lib/ollama"
 import { logGradientGeneration } from "@/lib/supabase"
+import Gallery from "@/pages/Gallery"
 
 // --- Color interpolation for gradient transition ---
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
@@ -132,6 +133,8 @@ export function App() {
   const colorStopsRef = useRef(colorStops)
   const animationFrameIdRef = useRef<number | null>(null)
   const preGenerateStopsRef = useRef<{ position: number; color: string }[]>([])
+  const lastDisplayedStopsRef = useRef<{ position: number; color: string }[]>([])
+  const generationIdRef = useRef(0)
 
   // On mobile: color strip starts below the top bar (input + download). sm (640px) = desktop.
   const [topMargin, setTopMargin] = useState(() =>
@@ -268,8 +271,10 @@ export function App() {
       animationFrameIdRef.current = null
     }
 
+    const id = ++generationIdRef.current
     const snapshot = colorStopsRef.current.map((s) => ({ position: s.position, color: s.color }))
     preGenerateStopsRef.current = snapshot
+    lastDisplayedStopsRef.current = snapshot
     setGenerateError(null)
     setIsGenerating(true)
 
@@ -283,6 +288,7 @@ export function App() {
         position: s.position,
         color: rotateHue(s.color, hueOffset),
       }))
+      lastDisplayedStopsRef.current = next
       setColorStops(next)
       animationFrameIdRef.current = requestAnimationFrame(animatePre)
     }
@@ -290,6 +296,7 @@ export function App() {
 
     try {
       const stops = await generateGradientFromPrompt(prompt)
+      if (id !== generationIdRef.current) return
       logGradientGeneration(prompt, stops)
       setHasCompletedFirstGeneration(true)
       if (animationFrameIdRef.current != null) {
@@ -298,7 +305,7 @@ export function App() {
       }
 
       const newStops = stops.map(({ color, stop }) => ({ position: stop, color }))
-      const current = colorStopsRef.current
+      const current = (lastDisplayedStopsRef.current?.length ? lastDisplayedStopsRef.current : colorStopsRef.current)
       const startColors = newStops.map((s) => sampleGradient(current, s.position / 100))
       const DURATION = 600
       const transitionState = { start: 0 }
@@ -313,11 +320,13 @@ export function App() {
           position: stop.position,
           color: lerpHex(startColors[i], stop.color, eased),
         }))
+        lastDisplayedStopsRef.current = interpolated
         setColorStops(interpolated)
 
         if (t < 1) {
           animationFrameIdRef.current = requestAnimationFrame(animateToResult)
         } else {
+          lastDisplayedStopsRef.current = newStops
           setColorStops(newStops)
           animationFrameIdRef.current = null
         }
@@ -329,11 +338,13 @@ export function App() {
         cancelAnimationFrame(animationFrameIdRef.current)
         animationFrameIdRef.current = null
       }
-      setColorStops(preGenerateStopsRef.current)
-      const msg = error instanceof Error ? error.message : String(error)
-      setGenerateError(msg)
+      if (id === generationIdRef.current) {
+        setColorStops(preGenerateStopsRef.current)
+        const msg = error instanceof Error ? error.message : String(error)
+        setGenerateError(msg)
+      }
     } finally {
-      setIsGenerating(false)
+      if (id === generationIdRef.current) setIsGenerating(false)
     }
   }
 
@@ -456,6 +467,10 @@ export function App() {
     // Show plus in the full gradient strip: above, between, and below the buttons
     const inGradientStrip = y >= topMargin && y <= pageHeight - BOTTOM_MARGIN
     setShowPlusCursor(inGradientStrip)
+  }
+
+  if (typeof window !== 'undefined' && window.location.pathname === '/gallery') {
+    return <Gallery onBack={() => { window.location.href = '/' }} />
   }
 
   return (
