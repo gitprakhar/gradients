@@ -100,6 +100,21 @@ function pickRandomPreset() {
   return { title: g.title, stops: g.stops.map((s) => ({ position: s.stop, color: s.color })) }
 }
 
+const GALLERY_APPLY_KEY = 'galleryApply'
+function consumeGalleryApply(): { stops: { color: string; stop: number }[]; userQuery: string } | null {
+  try {
+    const raw = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(GALLERY_APPLY_KEY) : null
+    if (!raw) return null
+    sessionStorage.removeItem(GALLERY_APPLY_KEY)
+    const data = JSON.parse(raw) as { stops?: unknown; userQuery?: string }
+    if (!data || !Array.isArray(data.stops) || data.stops.length === 0) return null
+    const stops = data.stops as { color: string; stop: number }[]
+    return { stops, userQuery: typeof data.userQuery === 'string' ? data.userQuery : '' }
+  } catch {
+    return null
+  }
+}
+
 // Create a plus cursor: square with plus inside, 24px to match h-6 buttons
 const plusCursor = `data:image/svg+xml;base64,${btoa(`
   <svg width="24" height="24" xmlns="http://www.w3.org/2000/svg">
@@ -113,14 +128,26 @@ export function App() {
   const initialPresetRef = useRef<ReturnType<typeof pickRandomPreset> | null>(null)
   if (initialPresetRef.current === null) initialPresetRef.current = pickRandomPreset()
 
-  const [colorStops, setColorStops] = useState(initialPresetRef.current.stops)
+  const galleryApplyRef = useRef(consumeGalleryApply())
+
+  const [colorStops, setColorStops] = useState(() => {
+    const g = galleryApplyRef.current
+    if (g && Array.isArray(g.stops) && g.stops.length > 0) {
+      return g.stops.map((s) => ({ position: s.stop, color: s.color }))
+    }
+    return initialPresetRef.current!.stops
+  })
   const [dragging, setDragging] = useState<number | null>(null)
   const [showPlusCursor, setShowPlusCursor] = useState(false)
-  const [inputValue, setInputValue] = useState('')
-  const [placeholderText, setPlaceholderText] = useState(initialPresetRef.current!.title)
+  const [inputValue, setInputValue] = useState(() => galleryApplyRef.current?.userQuery ?? '')
+  const [placeholderText, setPlaceholderText] = useState(() => {
+    const g = galleryApplyRef.current
+    if (g) return g.userQuery || 'Describe a gradient'
+    return initialPresetRef.current!.title
+  })
   const [isGenerating, setIsGenerating] = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
-  const [hasCompletedFirstGeneration, setHasCompletedFirstGeneration] = useState(false)
+  const [hasCompletedFirstGeneration, setHasCompletedFirstGeneration] = useState(() => !!galleryApplyRef.current)
   const [downloadOpen, setDownloadOpen] = useState(false)
   const [colorPickerFor, setColorPickerFor] = useState<number | null>(null)
   const [pickerPlaceAbove, setPickerPlaceAbove] = useState(false)

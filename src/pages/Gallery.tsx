@@ -177,7 +177,33 @@ export default function Gallery({ onBack }: { onBack: () => void }) {
             className="grid gap-2 grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(112px,1fr))]"
           >
             {sorted.map((item, i) => (
-              <div key={i} className="flex flex-col sm:block">
+              <div
+                key={i}
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  try {
+                    sessionStorage.setItem(
+                      'galleryApply',
+                      JSON.stringify({ stops: item.stops, userQuery: item.userQuery || '' })
+                    )
+                  } catch {}
+                  onBack()
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    try {
+                      sessionStorage.setItem(
+                        'galleryApply',
+                        JSON.stringify({ stops: item.stops, userQuery: item.userQuery || '' })
+                      )
+                    } catch {}
+                    onBack()
+                  }
+                }}
+                className="flex flex-col sm:block cursor-pointer"
+              >
                 {/* Gradient: 16:9 on mobile, square on desktop */}
                 <div
                   className="group relative aspect-video sm:aspect-square rounded-none shadow-sm ring-1 ring-black/5"
