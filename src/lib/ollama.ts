@@ -5,6 +5,16 @@ export interface GradientStop {
   stop: number
 }
 
+export interface RadialGradientResult {
+  centerColor: string
+  outerColor: string
+  midColors?: { color: string; position: number }[]
+  shape?: 'circle' | 'ellipse'
+  position?: string // e.g. "center", "bottom-center", "top-right", "off-left"
+  size?: 'small' | 'medium' | 'large'
+  softness?: 'sharp' | 'soft' | 'ultra-soft'
+}
+
 /**
  * Calls Ollama API to generate a gradient based on a text prompt.
  * Returns an array of { color, stop } where stop is 0–100 (percentage along the gradient).
@@ -147,6 +157,215 @@ Format: [{"color":"#RRGGBB","stop":number}, ...]`
     }))
   } catch (error) {
     // Friendlier message when local Ollama can't be reached
+    if (!OLLAMA_CONFIG.useCloud) {
+      const msg = String(error instanceof Error ? error.message : error).toLowerCase()
+      if (error instanceof TypeError || /failed to fetch|network|load failed|connection refused/i.test(msg)) {
+        throw new Error(
+          'Cannot reach Ollama. Is it running? Run `ollama serve` and pull a model (e.g. `ollama pull phi3`). If you use another model, set VITE_OLLAMA_MODEL in .env.local.'
+        )
+      }
+      if (/model.*not found|not found.*model|404/i.test(msg)) {
+        throw new Error(
+          `Model "${OLLAMA_CONFIG.model}" not found. Run \`ollama pull ${OLLAMA_CONFIG.model}\` or set VITE_OLLAMA_MODEL in .env.local to a model you have (e.g. llama3.2:latest).`
+        )
+      }
+    }
+    throw error
+  }
+}
+
+/**
+ * Calls Ollama API to generate a radial gradient based on a text prompt.
+ * Returns center color, outer color, optional mid colors, and shape.
+ */
+export async function generateRadialGradientFromPrompt(prompt: string): Promise<RadialGradientResult> {
+  const systemPrompt = `You generate beautiful radial gradients that capture the essence, mood, and color palette of ANY concept.
+
+A radial gradient is a glow emanating from a focal point—like light, energy, or atmosphere. Your job is to translate ANY input into a visually stunning gradient.
+
+Output format:
+{
+  "centerColor": "#RRGGBB",      // focal point color
+  "outerColor": "#RRGGBB",       // edge/background color
+  "midColors": [{"color": "#RRGGBB", "position": 20-80}],  // optional, for richer gradients
+  "position": "center" | "top-center" | "bottom-center" | "top-left" | "top-right" | "bottom-left" | "bottom-right",
+  "size": "small" | "medium" | "large",
+  "softness": "sharp" | "soft" | "ultra-soft",
+  "shape": "circle" | "ellipse"
+}
+
+Interpretation guide:
+
+EMOTIONS → Translate feeling into color temperature, intensity, and softness
+- Warm emotions (love, happy, hope) → warm colors, soft edges, centered or rising
+- Dark emotions (hate, anxiety, drowning) → deep/saturated colors, can be sharp, darker edges
+- Calm emotions → muted tones, ultra-soft, gentle transitions
+
+PLACES → Capture the iconic color palette and atmosphere, not literal geography
+- Cities → their vibe (Mumbai = vibrant yellows + ocean blues, Dubai = gold + deep blue night)
+- Nature locations → dominant landscape colors (Yosemite = forest green + granite gray + sky)
+- Countries → can reference flag colors OR iconic landscapes
+
+NATURE/WEATHER → Atmospheric interpretation
+- Time of day → position the "light source" appropriately (sunset = bottom, morning = top-right)
+- Weather → snow is soft whites, storms are dark and sharp
+- Elements → fire rises (bottom-center), water pools (center or bottom)
+
+OBJECTS → Extract the essential color palette
+- Focus on 2-3 most recognizable colors
+- Consider the object's texture (soft blanket = soft gradient, sharp pencil = defined stops)
+
+AESTHETICS/VIBES → Match the era or style's color language
+- "90s" → neon, cyan, magenta, high contrast
+- "cottage core" → muted greens, dusty pinks, cream
+- "cyber" → dark bases, neon accents, teals and magentas
+
+COLORS → Create depth and richness, not flat swatches
+- "blue" shouldn't be just blue—give it depth (deep navy center fading to bright cyan, or vice versa)
+- Add subtle variations to make single-color requests interesting
+
+ABSTRACT/POETIC → Interpret the imagery and mood
+- "jasmine in rain" → soft whites, pale greens, gray-blue mist
+- "drowning fade" → deep ocean blues, darkness pulling down
+
+NONSENSE/GREETINGS → Default to something friendly and universally appealing
+- Warm, approachable colors
+- Soft gradients
+- Nothing too extreme
+
+QUESTIONS → Answer visually
+- "What does X look like" → your best interpretation of X's color essence
+
+Size and softness guidelines:
+- "small" + "sharp": intense, focused energy (neon signs, spotlights, concentrated emotions like anxiety)
+- "medium" + "soft": balanced, most versatile (most objects, places, general moods)
+- "large" + "ultra-soft": atmospheric, ambient (skies, weather, calm emotions, time of day)
+
+Don't default to large/ultra-soft. Match the intensity of the concept:
+- "fire" → small-medium, sharp-soft (concentrated heat)
+- "sunset" → large, ultra-soft (atmospheric)
+- "neon" → small, sharp (focused glow)
+- "ocean" → large, soft (expansive but with presence)
+- "anxiety" → medium, sharp (tight, uncomfortable)
+- "hope" → medium-large, soft (warm but not overwhelming)
+
+Design principles:
+- Beautiful gradients have CONTRAST—don't make everything muddy middle tones
+- Position matters: light sources should feel natural (suns rise/set, glows emanate from logical places)
+- When in doubt, go with "position": "center", "size": "medium", "softness": "soft"
+
+Return ONLY valid JSON. No markdown, no explanation.`
+
+  try {
+    if (OLLAMA_CONFIG.useCloud && !OLLAMA_CONFIG.apiKey && !OLLAMA_CONFIG.serverAddsAuth) {
+      throw new Error(
+        'API key is required for Ollama Cloud. Set VITE_OLLAMA_API_KEY in .env.local (or OLLAMA_API_KEY on the server and VITE_OLLAMA_USE_PROXY=true on Vercel).'
+      )
+    }
+
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    }
+
+    if (OLLAMA_CONFIG.apiKey) {
+      headers['Authorization'] = `Bearer ${OLLAMA_CONFIG.apiKey}`
+    }
+
+    const url = OLLAMA_CONFIG.useCloud
+      ? `${OLLAMA_CONFIG.baseUrl}/chat`
+      : 'http://localhost:11434/api/chat'
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: OLLAMA_CONFIG.model,
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+          {
+            role: 'user',
+            content: `Generate a radial gradient for: ${prompt}`,
+          },
+        ],
+        stream: false,
+      }),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      let errMsg = `Ollama API error (${response.status}): ${errorText || response.statusText}`
+      try {
+        const errJson = errorText ? JSON.parse(errorText) : null
+        if (errJson?.error) errMsg = `Ollama: ${errJson.error}`
+      } catch (_) {}
+      throw new Error(errMsg)
+    }
+
+    const data = await response.json()
+    let content = data.message?.content || data.content || (typeof data === 'string' ? data : '')
+
+    // Strip markdown code blocks if present
+    const codeBlock = content.match(/```(?:json)?\s*([\s\S]*?)```/)
+    if (codeBlock) content = codeBlock[1].trim()
+
+    // Extract JSON object
+    let jsonMatch = content.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      const trimmed = content.trim()
+      if (trimmed.startsWith('{') && trimmed.endsWith('}')) jsonMatch = [trimmed]
+    }
+    if (!jsonMatch) throw new Error('Could not find JSON object in Ollama response')
+
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(jsonMatch[0])
+    } catch {
+      throw new Error('Could not parse JSON from Ollama response')
+    }
+
+    const obj = parsed as Record<string, unknown>
+    if (!obj.centerColor || !obj.outerColor) {
+      throw new Error('Invalid response: Need centerColor and outerColor')
+    }
+
+    const normalizeColor = (c: unknown): string => {
+      let color = String(c ?? '').trim()
+      if (!color.startsWith('#')) color = `#${color}`
+      if (color.length === 4)
+        color = `#${color[1]}${color[1]}${color[2]}${color[2]}${color[3]}${color[3]}`
+      return color.toUpperCase()
+    }
+
+    const centerColor = normalizeColor(obj.centerColor)
+    const outerColor = normalizeColor(obj.outerColor)
+
+    if (!/^#[0-9A-F]{6}$/i.test(centerColor) || !/^#[0-9A-F]{6}$/i.test(outerColor)) {
+      throw new Error('Invalid color format in response')
+    }
+
+    const result: RadialGradientResult = {
+      centerColor,
+      outerColor,
+      shape: obj.shape === 'ellipse' ? 'ellipse' : 'circle',
+      position: typeof obj.position === 'string' ? obj.position : 'center',
+      size: ['small', 'medium', 'large'].includes(obj.size as string) ? (obj.size as 'small' | 'medium' | 'large') : 'medium',
+      softness: ['sharp', 'soft', 'ultra-soft'].includes(obj.softness as string) ? (obj.softness as 'sharp' | 'soft' | 'ultra-soft') : 'soft',
+    }
+
+    if (Array.isArray(obj.midColors)) {
+      result.midColors = (obj.midColors as { color?: string; position?: number }[])
+        .map((m) => ({
+          color: normalizeColor(m.color),
+          position: Math.max(0, Math.min(100, Number(m.position) || 50)),
+        }))
+        .filter((m) => /^#[0-9A-F]{6}$/i.test(m.color))
+    }
+
+    return result
+  } catch (error) {
     if (!OLLAMA_CONFIG.useCloud) {
       const msg = String(error instanceof Error ? error.message : error).toLowerCase()
       if (error instanceof TypeError || /failed to fetch|network|load failed|connection refused/i.test(msg)) {

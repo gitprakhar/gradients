@@ -1,8 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { HexColorPicker } from 'react-colorful'
-import { generateGradientFromPrompt } from "@/lib/ollama"
+import { generateGradientFromPrompt, generateRadialGradientFromPrompt } from "@/lib/ollama"
+import type { RadialGradientResult } from "@/lib/ollama"
 import { logGradientGeneration } from "@/lib/supabase"
 import Gallery from "@/pages/Gallery"
+
+type GradientType = 'linear' | 'radial'
 
 // --- Color interpolation for gradient transition ---
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
@@ -95,9 +98,82 @@ const PRESET_GRADIENTS: { title: string; stops: { color: string; stop: number }[
   { title: 'Deep dark forest', stops: [{ color: '#0B1A0C', stop: 0 }, { color: '#1B4B29', stop: 50 }, { color: '#356B3A', stop: 100 }] },
 ]
 
+// Radial gradient presets matching the linear ones by title
+const PRESET_RADIAL_GRADIENTS: Record<string, RadialGradientResult> = {
+  'Golden hour': {
+    centerColor: '#FFC107',
+    outerColor: '#FFF8E1',
+    midColors: [{ color: '#FFB300', position: 40 }, { color: '#FF8F00', position: 60 }],
+    shape: 'circle',
+    size: 'large',
+    softness: 'soft',
+    position: 'center',
+  },
+  'Kind of blue': {
+    centerColor: '#003366',
+    outerColor: '#66B2FF',
+    midColors: [{ color: '#0077CC', position: 34 }, { color: '#99CCFF', position: 60 }],
+    shape: 'circle',
+    size: 'medium',
+    softness: 'soft',
+    position: 'center',
+  },
+  'Cherry blossoms in spring': {
+    centerColor: '#FFB6C1',
+    outerColor: '#FFE6EE',
+    midColors: [{ color: '#FFCCE5', position: 30 }, { color: '#FFF5FA', position: 60 }],
+    shape: 'circle',
+    size: 'large',
+    softness: 'soft',
+    position: 'center',
+  },
+  'Pink clouds at sunset': {
+    centerColor: '#FF4D4D',
+    outerColor: '#FFE5DC',
+    midColors: [{ color: '#FF8E80', position: 40 }, { color: '#FFDAB7', position: 60 }],
+    shape: 'ellipse',
+    size: 'large',
+    softness: 'soft',
+    position: 'bottom-center',
+  },
+  'Deep dark forest': {
+    centerColor: '#013224',
+    outerColor: '#0A0A0A',
+    midColors: [{ color: '#02462A', position: 26 }, { color: '#04662D', position: 60 }],
+    shape: 'circle',
+    size: 'large',
+    softness: 'soft',
+    position: 'center',
+  },
+  'Winter evening glow': {
+    centerColor: '#FFCC66',
+    outerColor: '#112244',
+    midColors: [{ color: '#F1E8C6', position: 45 }],
+    shape: 'circle',
+    size: 'large',
+    softness: 'soft',
+    position: 'center',
+  },
+  'What Mars would look like': {
+    centerColor: '#FF6B0F',
+    outerColor: '#E6B07C',
+    midColors: [{ color: '#A52A2A', position: 50 }],
+    shape: 'circle',
+    size: 'medium',
+    softness: 'soft',
+    position: 'center',
+  },
+}
+
 function pickRandomPreset() {
-  const g = PRESET_GRADIENTS[Math.floor(Math.random() * PRESET_GRADIENTS.length)]
-  return { title: g.title, stops: g.stops.map((s) => ({ position: s.stop, color: s.color })) }
+  const idx = Math.floor(Math.random() * PRESET_GRADIENTS.length)
+  const g = PRESET_GRADIENTS[idx]
+  const radial = PRESET_RADIAL_GRADIENTS[g.title] || null
+  return {
+    title: g.title,
+    stops: g.stops.map((s) => ({ position: s.stop, color: s.color })),
+    radial,
+  }
 }
 
 const GALLERY_APPLY_KEY = 'galleryApply'
@@ -137,6 +213,11 @@ export function App() {
     }
     return initialPresetRef.current!.stops
   })
+  const [gradientType, setGradientType] = useState<GradientType>('linear')
+  const [radialGradient, setRadialGradient] = useState<RadialGradientResult | null>(() => {
+    // Initialize with the preset's radial gradient for landing page
+    return initialPresetRef.current?.radial || null
+  })
   const [dragging, setDragging] = useState<number | null>(null)
   const [showPlusCursor, setShowPlusCursor] = useState(false)
   const [inputValue, setInputValue] = useState(() => galleryApplyRef.current?.userQuery ?? '')
@@ -149,14 +230,15 @@ export function App() {
   const [generateError, setGenerateError] = useState<string | null>(null)
   const [hasCompletedFirstGeneration, setHasCompletedFirstGeneration] = useState(() => !!galleryApplyRef.current)
   const [downloadOpen, setDownloadOpen] = useState(false)
+  const [copiedCSS, setCopiedCSS] = useState(false)
   const [colorPickerFor, setColorPickerFor] = useState<number | null>(null)
   const [pickerPlaceAbove, setPickerPlaceAbove] = useState(false)
+  const [showLinearLayer, setShowLinearLayer] = useState(gradientType === 'linear')
   const pillRefs = useRef<(HTMLDivElement | null)[]>([])
   const stopContainerRefs = useRef<(HTMLDivElement | null)[]>([])
   const pageRef = useRef<HTMLDivElement>(null)
   const hasDraggedRef = useRef<boolean>(false)
   const inputRef = useRef<HTMLInputElement>(null)
-  const measureRef = useRef<HTMLSpanElement>(null)
   const colorStopsRef = useRef(colorStops)
   const animationFrameIdRef = useRef<number | null>(null)
   const preGenerateStopsRef = useRef<{ position: number; color: string }[]>([])
@@ -198,35 +280,18 @@ export function App() {
     return () => window.removeEventListener('mousedown', onMouseDown)
   }, [colorPickerFor])
 
-  // Measure input width: min = placeholder, expand when prompt exceeds that
+  // Sync showLinearLayer with gradientType changes (for crossfade on homepage)
   useEffect(() => {
-    if (measureRef.current && inputRef.current) {
-      measureRef.current.textContent = placeholderText
-      const minTextWidth = measureRef.current.offsetWidth
-
-      const textToMeasure = inputValue || placeholderText
-      measureRef.current.textContent = textToMeasure
-      const textWidth = measureRef.current.offsetWidth
-
-      const { paddingLeft, paddingRight } = getComputedStyle(inputRef.current)
-      const padding = parseFloat(paddingLeft) + parseFloat(paddingRight)
-      inputRef.current.style.width = `${Math.max(textWidth, minTextWidth) + padding}px`
+    if (!hasCompletedFirstGeneration) {
+      setShowLinearLayer(gradientType === 'linear')
     }
-  }, [inputValue, placeholderText])
-
-  // On mobile, when switching to the main view after generation, show the start of long prompts
-  useEffect(() => {
-    if (!hasCompletedFirstGeneration) return
-    const el = inputRef.current
-    if (!el || (typeof window !== 'undefined' && !window.matchMedia('(max-width: 639px)').matches)) return
-    const id = requestAnimationFrame(() => { el.scrollLeft = 0 })
-    return () => cancelAnimationFrame(id)
-  }, [hasCompletedFirstGeneration])
+  }, [gradientType, hasCompletedFirstGeneration])
 
   const handleLineClick = (e: React.MouseEvent) => {
     if (!hasCompletedFirstGeneration) return
+    if (gradientType === 'radial') return
     if (!pageRef.current || dragging !== null) return
-    
+
     // Only create new stop if plus cursor is showing
     if (!showPlusCursor) return
     
@@ -289,7 +354,7 @@ export function App() {
     setColorStops(newStops)
   }
 
-  const handleGenerateGradient = async () => {
+  const handleGenerateGradient = async (type: GradientType = gradientType) => {
     const prompt = inputValue.trim()
     if (!prompt || isGenerating) return
 
@@ -304,7 +369,28 @@ export function App() {
     lastDisplayedStopsRef.current = snapshot
     setGenerateError(null)
     setIsGenerating(true)
+    setGradientType(type)
 
+    if (type === 'radial') {
+      // For radial gradients, no pre-animation for now, just show loading
+      try {
+        const result = await generateRadialGradientFromPrompt(prompt)
+        if (id !== generationIdRef.current) return
+        setRadialGradient(result)
+        setHasCompletedFirstGeneration(true)
+        setPlaceholderText(prompt)
+      } catch (error) {
+        if (id === generationIdRef.current) {
+          const msg = error instanceof Error ? error.message : String(error)
+          setGenerateError(msg)
+        }
+      } finally {
+        if (id === generationIdRef.current) setIsGenerating(false)
+      }
+      return
+    }
+
+    // Linear gradient logic (existing)
     // Pre-response: colors start changing immediately (hue rotation) while the model runs
     const rafState = { start: 0 }
     const animatePre = (now: number) => {
@@ -378,7 +464,7 @@ export function App() {
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      handleGenerateGradient()
+      handleGenerateGradient(gradientType)
     }
   }
 
@@ -417,28 +503,73 @@ export function App() {
   }, [dragging, colorStops, topMargin])
 
   const handleDownload = (width: number, height: number, aspectRatioName: string) => {
-    // Create a canvas with specified aspect ratio
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    
+
     if (!ctx) return;
-    
-    // Set canvas size
+
     canvas.width = width;
     canvas.height = height;
-    
-    // Create gradient with all color stops
-    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    const sortedStops = [...colorStops].sort((a, b) => a.position - b.position)
-    sortedStops.forEach(stop => {
-      gradient.addColorStop(stop.position / 100, stop.color)
-    })
-    
-    // Fill canvas with gradient
+
+    let gradient: CanvasGradient;
+
+    if (gradientType === 'radial' && radialGradient) {
+      const { position, size, softness } = radialGradient;
+
+      // Calculate center position based on position string
+      let centerX = width / 2;
+      let centerY = height / 2;
+      const pos = position || 'center';
+      if (pos.includes('left')) centerX = pos.includes('off') ? -width * 0.2 : 0;
+      if (pos.includes('right')) centerX = pos.includes('off') ? width * 1.2 : width;
+      if (pos.includes('top')) centerY = pos.includes('off') ? -height * 0.2 : 0;
+      if (pos.includes('bottom')) centerY = pos.includes('off') ? height * 1.2 : height;
+
+      // Calculate radius based on size
+      let radius: number;
+      const sizeVal = size || 'medium';
+      if (sizeVal === 'small') {
+        radius = Math.min(width, height) / 3;
+      } else if (sizeVal === 'large') {
+        radius = Math.max(width, height);
+      } else {
+        radius = Math.max(width, height) / 2;
+      }
+
+      gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
+
+      // Apply softness to color stops
+      const softnessStops: Record<string, { center: number; outer: number }> = {
+        'sharp': { center: 0, outer: 0.6 },
+        'soft': { center: 0, outer: 0.85 },
+        'ultra-soft': { center: 0, outer: 1 },
+      };
+      const { center: centerStop, outer: outerStop } = softnessStops[softness || 'soft'] || softnessStops['soft'];
+
+      gradient.addColorStop(centerStop, radialGradient.centerColor);
+      if (radialGradient.midColors) {
+        const sortedMid = [...radialGradient.midColors].sort((a, b) => a.position - b.position);
+        sortedMid.forEach((m) => {
+          const scaledPos = centerStop + (m.position / 100) * (outerStop - centerStop);
+          gradient.addColorStop(scaledPos, m.color);
+        });
+      }
+      gradient.addColorStop(outerStop, radialGradient.outerColor);
+      if (outerStop < 1) {
+        gradient.addColorStop(1, radialGradient.outerColor);
+      }
+    } else {
+      // Linear gradient
+      gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      const sortedStops = [...colorStops].sort((a, b) => a.position - b.position);
+      sortedStops.forEach(stop => {
+        gradient.addColorStop(stop.position / 100, stop.color);
+      });
+    }
+
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // Convert canvas to blob and download
+
     canvas.toBlob((blob) => {
       if (blob) {
         const url = URL.createObjectURL(blob);
@@ -451,13 +582,87 @@ export function App() {
     });
   };
 
+  const handleCopyCSS = async () => {
+    const css = `background: ${gradientString()};`
+    try {
+      await navigator.clipboard.writeText(css)
+      setCopiedCSS(true)
+      setTimeout(() => setCopiedCSS(false), 2000)
+    } catch {
+      // Fallback for older browsers
+      const textarea = document.createElement('textarea')
+      textarea.value = css
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+      setCopiedCSS(true)
+      setTimeout(() => setCopiedCSS(false), 2000)
+    }
+  }
+
   const gradientString = () => {
+    if (gradientType === 'radial' && radialGradient) {
+      const { centerColor, outerColor, midColors, shape, position, size, softness } = radialGradient
+
+      // Map position string to CSS position
+      const positionMap: Record<string, string> = {
+        'center': 'center',
+        'top': 'center top',
+        'bottom': 'center bottom',
+        'left': 'left center',
+        'right': 'right center',
+        'top-left': 'left top',
+        'top-right': 'right top',
+        'bottom-left': 'left bottom',
+        'bottom-right': 'right bottom',
+        'bottom-center': 'center bottom',
+        'top-center': 'center top',
+        'off-left': '-20% center',
+        'off-right': '120% center',
+        'off-top': 'center -20%',
+        'off-bottom': 'center 120%',
+      }
+      const cssPosition = positionMap[position || 'center'] || 'center'
+
+      // Map size to gradient extent
+      const sizeMap: Record<string, string> = {
+        'small': 'closest-side',
+        'medium': 'farthest-corner',
+        'large': 'farthest-side',
+      }
+      const cssSize = sizeMap[size || 'medium'] || 'farthest-corner'
+
+      // Map softness to color stop positions (affects how quickly center fades to outer)
+      const softnessStops: Record<string, { center: number; outer: number }> = {
+        'sharp': { center: 0, outer: 60 },
+        'soft': { center: 0, outer: 85 },
+        'ultra-soft': { center: 0, outer: 100 },
+      }
+      const { center: centerStop, outer: outerStop } = softnessStops[softness || 'soft'] || softnessStops['soft']
+
+      const stops: string[] = [`${centerColor} ${centerStop}%`]
+      if (midColors && midColors.length > 0) {
+        const sortedMid = [...midColors].sort((a, b) => a.position - b.position)
+        sortedMid.forEach((m) => {
+          // Scale mid position between center and outer stops
+          const scaledPos = centerStop + (m.position / 100) * (outerStop - centerStop)
+          stops.push(`${m.color} ${scaledPos}%`)
+        })
+      }
+      stops.push(`${outerColor} ${outerStop}%`)
+      if (outerStop < 100) {
+        stops.push(`${outerColor} 100%`)
+      }
+
+      return `radial-gradient(${shape || 'circle'} ${cssSize} at ${cssPosition}, ${stops.join(', ')})`
+    }
     const sortedStops = [...colorStops].sort((a, b) => a.position - b.position)
     return `linear-gradient(to bottom, ${sortedStops.map(s => `${s.color} ${s.position}%`).join(', ')})`
   }
 
   const handlePageMouseMove = (e: React.MouseEvent) => {
-    if (!hasCompletedFirstGeneration) {
+    if (!hasCompletedFirstGeneration || gradientType === 'radial') {
       setShowPlusCursor(false)
       return
     }
@@ -501,9 +706,9 @@ export function App() {
   }
 
   return (
-    <div 
+    <div
       ref={pageRef}
-      className="w-full h-full min-h-0 relative overflow-hidden" 
+      className="w-full h-full min-h-0 relative overflow-hidden"
       style={{
         background: gradientString(),
         cursor: dragging !== null ? 'grabbing' : (hasCompletedFirstGeneration && showPlusCursor ? `url("${plusCursor}") 12 12, crosshair` : 'default')
@@ -512,55 +717,66 @@ export function App() {
       onMouseMove={handlePageMouseMove}
       onMouseLeave={() => setShowPlusCursor(false)}
     >
+      {/* Crossfade layers for gradient type switching on homepage */}
+      {!hasCompletedFirstGeneration && (
+        <>
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: (() => {
+                const sortedStops = [...colorStops].sort((a, b) => a.position - b.position)
+                return `linear-gradient(to bottom, ${sortedStops.map(s => `${s.color} ${s.position}%`).join(', ')})`
+              })(),
+              opacity: showLinearLayer ? 1 : 0,
+              transition: 'opacity 0.6s ease-in-out',
+            }}
+          />
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: radialGradient ? (() => {
+                const { centerColor, outerColor, midColors, shape, position, size, softness } = radialGradient
+                const positionMap: Record<string, string> = {
+                  'center': 'center', 'top': 'center top', 'bottom': 'center bottom',
+                  'left': 'left center', 'right': 'right center', 'top-left': 'left top',
+                  'top-right': 'right top', 'bottom-left': 'left bottom', 'bottom-right': 'right bottom',
+                  'bottom-center': 'center bottom', 'top-center': 'center top',
+                }
+                const cssPosition = positionMap[position || 'center'] || 'center'
+                const sizeMap: Record<string, string> = { 'small': 'closest-side', 'medium': 'farthest-corner', 'large': 'farthest-side' }
+                const cssSize = sizeMap[size || 'medium'] || 'farthest-corner'
+                const softnessStops: Record<string, { center: number; outer: number }> = {
+                  'sharp': { center: 0, outer: 60 }, 'soft': { center: 0, outer: 85 }, 'ultra-soft': { center: 0, outer: 100 },
+                }
+                const { center: centerStop, outer: outerStop } = softnessStops[softness || 'soft'] || softnessStops['soft']
+                const stops: string[] = [`${centerColor} ${centerStop}%`]
+                if (midColors && midColors.length > 0) {
+                  const sortedMid = [...midColors].sort((a, b) => a.position - b.position)
+                  sortedMid.forEach((m) => {
+                    const scaledPos = centerStop + (m.position / 100) * (outerStop - centerStop)
+                    stops.push(`${m.color} ${scaledPos}%`)
+                  })
+                }
+                stops.push(`${outerColor} ${outerStop}%`)
+                if (outerStop < 100) stops.push(`${outerColor} 100%`)
+                return `radial-gradient(${shape || 'circle'} ${cssSize} at ${cssPosition}, ${stops.join(', ')})`
+              })() : 'transparent',
+              opacity: showLinearLayer ? 0 : 1,
+              transition: 'opacity 0.6s ease-in-out',
+            }}
+          />
+        </>
+      )}
           {!hasCompletedFirstGeneration ? (
-            /* Landing: gradient + centered input only; no download, no color pills */
+            /* Landing: gradient + centered input with radial/linear buttons */
             <div
               className="absolute inset-0 flex items-center justify-center"
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
             >
               <div className="flex flex-col items-center gap-2">
-                <span
-                  ref={measureRef}
-                  className="absolute invisible whitespace-pre text-sm font-sans"
-                  style={{ visibility: 'hidden', position: 'absolute' }}
-                >
-                  {placeholderText}
-                </span>
-                <input
-                  ref={inputRef}
-                  type="text"
-                  autoFocus
-                  enterKeyHint="go"
-                  placeholder={placeholderText}
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyDown={handleInputKeyDown}
-                  disabled={isGenerating}
-                  className="h-9 sm:h-6 min-h-0 m-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow outline-none text-gray-800 text-sm font-sans leading-none placeholder:text-gray-600 focus:placeholder:text-gray-600 disabled:opacity-50 max-w-[70vw] sm:max-w-none"
-                  onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
-                />
-                {generateError && (
-                  <p className="text-xs font-sans text-red-600 mt-0.5" role="alert">
-                    {generateError}
-                  </p>
-                )}
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* Mobile: input + download at bottom; sm+: top-left row with "Download" text */}
-              <div className="absolute inset-0 sm:inset-auto sm:top-8 sm:left-8 sm:right-auto sm:bottom-auto sm:max-w-[min(48vw,1100px)] flex flex-col items-center justify-end sm:items-stretch sm:justify-start gap-1 pb-10 sm:pb-0">
-                <div className="flex flex-row items-center justify-center sm:justify-start gap-2 min-w-0 max-w-[calc(100vw-4rem)] px-4 sm:px-0">
-                  <div className="flex items-center min-w-0 flex-1 sm:flex-1">
-                    <span
-                      ref={measureRef}
-                      className="absolute invisible whitespace-pre text-sm font-sans"
-                      style={{ visibility: 'hidden', position: 'absolute' }}
-                    >
-                      {placeholderText}
-                    </span>
+                <div className="bg-white/80 backdrop-blur-xl shadow" style={{ width: 320 }}>
+                  <div className="px-3 py-3">
                     <input
                       ref={inputRef}
                       type="text"
@@ -571,38 +787,162 @@ export function App() {
                       onChange={(e) => setInputValue(e.target.value)}
                       onKeyDown={handleInputKeyDown}
                       disabled={isGenerating}
-                      className="h-9 sm:h-6 min-h-0 m-0 border-0 bg-white/80 backdrop-blur-xl px-2 py-1 shadow outline-none text-gray-800 text-sm font-sans leading-none placeholder:text-gray-600 focus:placeholder:text-gray-600 disabled:opacity-50 max-w-[70vw] sm:max-w-full"
+                      style={{ width: '100%' }}
+                      className="block h-6 m-0 p-0 border-0 bg-transparent outline-none text-gray-800 text-base font-sans placeholder:text-gray-500 disabled:opacity-50"
                       onClick={(e) => e.stopPropagation()}
                       onMouseDown={(e) => e.stopPropagation()}
                     />
                   </div>
+                  <div className="flex items-center justify-between px-2 pb-2">
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setGradientType('linear')
+                        }}
+                        disabled={isGenerating}
+                        className={`px-3 py-1.5 text-xs font-sans transition-colors ${
+                          gradientType === 'linear'
+                            ? 'bg-gray-800 text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        } disabled:opacity-50`}
+                      >
+                        Linear
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setGradientType('radial')
+                        }}
+                        disabled={isGenerating}
+                        className={`px-3 py-1.5 text-xs font-sans transition-colors ${
+                          gradientType === 'radial'
+                            ? 'bg-gray-800 text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        } disabled:opacity-50`}
+                      >
+                        Radial
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleGenerateGradient()
+                      }}
+                      disabled={isGenerating || !inputValue.trim()}
+                      className="w-8 h-8 flex items-center justify-center bg-gray-800 text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      aria-label="Generate gradient"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5 12h14" />
+                        <path d="M12 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                {generateError && (
+                  <p className="text-xs font-sans text-red-600 mt-0.5" role="alert">
+                    {generateError}
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Bottom center: search bar (same style as landing) */}
+              <div
+                className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2"
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <div className="bg-white/80 backdrop-blur-xl shadow" style={{ width: 320 }}>
+                  <div className="px-3 py-3">
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      enterKeyHint="go"
+                      placeholder={placeholderText}
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      onKeyDown={handleInputKeyDown}
+                      disabled={isGenerating}
+                      style={{ width: '100%' }}
+                      className="block h-6 m-0 p-0 border-0 bg-transparent outline-none text-gray-800 text-base font-sans placeholder:text-gray-500 disabled:opacity-50"
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between px-2 pb-2">
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setGradientType('linear')
+                        }}
+                        disabled={isGenerating}
+                        className={`px-3 py-1.5 text-xs font-sans transition-colors ${
+                          gradientType === 'linear'
+                            ? 'bg-gray-800 text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        } disabled:opacity-50`}
+                      >
+                        Linear
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setGradientType('radial')
+                        }}
+                        disabled={isGenerating}
+                        className={`px-3 py-1.5 text-xs font-sans transition-colors ${
+                          gradientType === 'radial'
+                            ? 'bg-gray-800 text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        } disabled:opacity-50`}
+                      >
+                        Radial
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleGenerateGradient()
+                      }}
+                      disabled={isGenerating || !inputValue.trim()}
+                      className="w-8 h-8 flex items-center justify-center bg-gray-800 text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      aria-label="Generate gradient"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5 12h14" />
+                        <path d="M12 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                {/* Download and Copy CSS buttons below search bar */}
+                <div className="flex items-center gap-1">
                   <div
-                    className="relative flex items-center justify-center flex-shrink-0"
+                    className="relative"
                     onMouseEnter={() => setDownloadOpen(true)}
                     onMouseLeave={() => setDownloadOpen(false)}
                   >
                     <button
                       type="button"
+                      onClick={(e) => e.stopPropagation()}
                       onMouseDown={(e) => e.stopPropagation()}
-                      onClick={(e) => {
-                        if (typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches) {
-                          e.stopPropagation()
-                          handleDownload(1080, 1920, '9-16')
-                        }
-                      }}
-                      className="h-9 w-9 min-h-0 min-w-0 m-0 p-0 border-0 bg-white/80 backdrop-blur-xl shadow text-gray-800 flex items-center justify-center hover:opacity-90 transition-opacity appearance-none sm:h-6 sm:w-auto sm:min-w-0 sm:px-2 sm:py-1"
-                      aria-label="Download"
+                      className="px-3 py-1.5 text-xs font-sans transition-colors bg-gray-100 text-gray-600 hover:bg-gray-200"
                     >
-                      <svg className="w-3.5 h-3.5 sm:hidden shrink-0 block self-center" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                        <path d="M12 4.5v7" />
-                        <path d="M8 11.5l4 4 4-4" />
-                        <path d="M5 19.5h14" />
-                      </svg>
-                      <span className="hidden sm:inline text-sm font-sans leading-none">Download</span>
+                      Download
                     </button>
                     {downloadOpen && (
                       <div
-                        className="hidden sm:block absolute right-0 left-auto sm:left-0 sm:right-auto top-full mt-0 z-50 min-w-[180px] bg-white/80 backdrop-blur-xl shadow py-1"
+                        className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1 z-50 min-w-[180px] bg-white/95 backdrop-blur-xl shadow py-1"
                         onMouseDown={(e) => e.stopPropagation()}
                       >
                         {DOWNLOAD_SIZES.map(({ label, width, height, name }) => (
@@ -622,6 +962,17 @@ export function App() {
                       </div>
                     )}
                   </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleCopyCSS()
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="px-3 py-1.5 text-xs font-sans transition-colors bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  >
+                    {copiedCSS ? 'Copied!' : 'Copy CSS'}
+                  </button>
                 </div>
                 {generateError && (
                   <p className="text-xs font-sans text-red-600 mt-0.5" role="alert">
@@ -630,36 +981,36 @@ export function App() {
                 )}
               </div>
 
-              {/* Color stop controls: hidden on mobile, only search + download; visible from sm+ */}
-              <div className="hidden sm:block">
+              {/* Color stop controls: on the left side, hidden on mobile and when radial gradient is selected */}
+              {gradientType === 'linear' && <div className="hidden sm:block">
               {colorStops.map((stop, index) => {
             const BOTTOM_MARGIN = 32
             const pageHeight = pageRef.current?.clientHeight || window.innerHeight
             const availableHeight = pageHeight - topMargin - BOTTOM_MARGIN
-            
+
             // For position 100, use bottom instead of top to prevent going off screen
             const isBottom = stop.position === 100
             const topPx = topMargin + (stop.position / 100) * availableHeight
-            
+
             return (
               <div
                 key={index}
                 ref={(el) => { stopContainerRefs.current[index] = el }}
-                className={`absolute left-8 sm:left-1/2 sm:-translate-x-1/2 flex items-center gap-1.5 ${colorPickerFor === index ? 'z-[100]' : 'z-10'}`}
-                style={{ 
-                  ...(isBottom 
+                className={`absolute left-8 flex items-center gap-1.5 ${colorPickerFor === index ? 'z-[100]' : 'z-10'}`}
+                style={{
+                  ...(isBottom
                     ? { bottom: `${BOTTOM_MARGIN}px` }
                     : { top: `${topPx}px` }
                   ),
                 }}
               >
-                <div 
+                <div
                   ref={(el) => { pillRefs.current[index] = el }}
                   className={`relative flex items-center gap-1.5 bg-white/80 backdrop-blur-xl px-2 py-1 shadow cursor-grab active:cursor-grabbing ${colorPickerFor === index ? 'z-10' : ''}`}
                   onMouseDown={handleCircleMouseDown(index)}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {/* Color square — only this opens the picker; input overlay for real click (Safari), stopPropagation so pill doesn’t drag */}
+                  {/* Color square — only this opens the picker; input overlay for real click (Safari), stopPropagation so pill doesn't drag */}
                   <div
                     className="relative w-4 h-4 flex-shrink-0 cursor-pointer"
                     onClick={(e) => {
@@ -681,7 +1032,7 @@ export function App() {
                       aria-hidden
                     />
                   </div>
-                  
+
                   {/* Hex code — rest of pill is for drag */}
                   <span className="text-xs font-sans leading-none text-gray-800">
                     {stop.color.toUpperCase()}
@@ -711,7 +1062,7 @@ export function App() {
               </div>
             )
           })}
-              </div>
+              </div>}
             </>
           )}
     </div>
