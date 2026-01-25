@@ -244,6 +244,7 @@ export function App() {
   const preGenerateStopsRef = useRef<{ position: number; color: string }[]>([])
   const lastDisplayedStopsRef = useRef<{ position: number; color: string }[]>([])
   const generationIdRef = useRef(0)
+  const preGenerateRadialRef = useRef<RadialGradientResult | null>(null)
 
   // On mobile: color strip starts below the top bar (input + download). sm (640px) = desktop.
   const [topMargin, setTopMargin] = useState(() =>
@@ -372,15 +373,92 @@ export function App() {
     setGradientType(type)
 
     if (type === 'radial') {
-      // For radial gradients, no pre-animation for now, just show loading
+      // Capture the current radial gradient for animation
+      const currentRadial = radialGradient
+      preGenerateRadialRef.current = currentRadial
+
+      // Pre-response: hue rotation animation while waiting for API
+      if (currentRadial) {
+        const rafState = { start: 0 }
+        const animatePreRadial = (now: number) => {
+          if (!rafState.start) rafState.start = now
+          const elapsed = now - rafState.start
+          const hueOffset = (elapsed * 0.08) % 360
+          const base = preGenerateRadialRef.current
+          if (base) {
+            setRadialGradient({
+              ...base,
+              centerColor: rotateHue(base.centerColor, hueOffset),
+              outerColor: rotateHue(base.outerColor, hueOffset),
+              midColors: base.midColors?.map(m => ({
+                ...m,
+                color: rotateHue(m.color, hueOffset),
+              })),
+            })
+          }
+          animationFrameIdRef.current = requestAnimationFrame(animatePreRadial)
+        }
+        animationFrameIdRef.current = requestAnimationFrame(animatePreRadial)
+      }
+
       try {
         const result = await generateRadialGradientFromPrompt(prompt)
         if (id !== generationIdRef.current) return
-        setRadialGradient(result)
+
+        // Stop pre-animation
+        if (animationFrameIdRef.current != null) {
+          cancelAnimationFrame(animationFrameIdRef.current)
+          animationFrameIdRef.current = null
+        }
+
+        // Animate transition from current to new radial gradient
+        const startRadial = preGenerateRadialRef.current || result
+        const DURATION = 600
+        const transitionState = { start: 0 }
+
+        const animateToRadialResult = (now: number) => {
+          if (!transitionState.start) transitionState.start = now
+          const elapsed = now - transitionState.start
+          const t = Math.min(1, elapsed / DURATION)
+          const eased = easeInOutCubic(t)
+
+          // Interpolate colors
+          const interpolatedRadial: RadialGradientResult = {
+            ...result,
+            centerColor: lerpHex(startRadial.centerColor, result.centerColor, eased),
+            outerColor: lerpHex(startRadial.outerColor, result.outerColor, eased),
+            midColors: result.midColors?.map((m, i) => ({
+              ...m,
+              color: lerpHex(
+                startRadial.midColors?.[i]?.color || startRadial.centerColor,
+                m.color,
+                eased
+              ),
+            })),
+          }
+          setRadialGradient(interpolatedRadial)
+
+          if (t < 1) {
+            animationFrameIdRef.current = requestAnimationFrame(animateToRadialResult)
+          } else {
+            setRadialGradient(result)
+            animationFrameIdRef.current = null
+          }
+        }
+        animationFrameIdRef.current = requestAnimationFrame(animateToRadialResult)
+
         setHasCompletedFirstGeneration(true)
         setPlaceholderText(prompt)
       } catch (error) {
+        if (animationFrameIdRef.current != null) {
+          cancelAnimationFrame(animationFrameIdRef.current)
+          animationFrameIdRef.current = null
+        }
         if (id === generationIdRef.current) {
+          // Restore original radial gradient on error
+          if (preGenerateRadialRef.current) {
+            setRadialGradient(preGenerateRadialRef.current)
+          }
           const msg = error instanceof Error ? error.message : String(error)
           setGenerateError(msg)
         }
