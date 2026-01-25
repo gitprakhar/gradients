@@ -20,24 +20,66 @@ export interface RadialGradientResult {
  * Returns an array of { color, stop } where stop is 0–100 (percentage along the gradient).
  */
 export async function generateGradientFromPrompt(prompt: string): Promise<GradientStop[]> {
-  const systemPrompt = `You are a gradient color generator. Create beautiful, well-balanced gradients based on user descriptions.
+  const systemPrompt = `You generate beautiful linear gradients that capture the essence, mood, and color palette of ANY concept.
+
+A linear gradient flows from top to bottom, like light falling, atmosphere shifting, or energy moving. Your job is to translate ANY input into a visually stunning gradient.
+
+Output format:
+[{"color": "#RRGGBB", "stop": 0}, {"color": "#RRGGBB", "stop": 100}]
 
 Rules:
 - Generate 2-4 color stops
-- Each stop: {"color": "#RRGGBB", "stop": 0-100}
-- "stop" is the position: 0 = start, 100 = end
+- "stop" is position: 0 = top, 100 = bottom
 - First stop must be 0, last must be 100
-- Middle stops create smooth transitions (e.g., 30, 60)
-- Match the visual essence of the description (e.g., "night sky" = dark blues, not bright)
-- For abstract concepts (e.g., "joy", "energy"), interpret the mood with appropriate colors
-- Adjacent colors should blend naturally
+- Middle stops (e.g., 30, 60) create richer transitions
 
-Examples:
-- "night sky" → [{"color":"#0a1128","stop":0},{"color":"#1e3a8a","stop":100}]
-- "sunset" → [{"color":"#ff6b35","stop":0},{"color":"#f7931e","stop":40},{"color":"#feca57","stop":100}]
-- "forest" → [{"color":"#1a4d2e","stop":0},{"color":"#4f7942","stop":100}]
+Interpretation guide:
 
-Return ONLY valid JSON. No markdown, no explanation.
+EMOTIONS → Translate feeling into color flow
+- Warm emotions (love, happy, hope) → warm colors flowing down, light to rich
+- Dark emotions (hate, anxiety, drowning) → heavy darks at top or bottom, saturated tones
+- Calm emotions → muted tones, gentle transitions, no harsh jumps
+
+PLACES → Capture the iconic color palette and atmosphere
+- Cities → their vibe (Mumbai = golden sun over ocean blue, LA = pink haze to deep purple)
+- Nature locations → sky-to-ground logic (mountains = pale sky to deep forest, desert = hot white to sand orange)
+- Countries → flag colors OR iconic landscape colors
+
+NATURE/WEATHER → Think like a sky or landscape
+- Time of day → sunrise/sunset warm at bottom rising to cool; night dark throughout
+- Weather → storms are heavy grays/blues; snow is soft whites with cool blue shadows
+- Seasons → summer is bright and warm; winter is cool and muted
+
+OBJECTS → Extract the essential color palette
+- Focus on 2-3 most recognizable colors
+- Arrange them in a way that feels natural (e.g., apple = deep red to bright red to green stem hint)
+
+AESTHETICS/VIBES → Match the era or style
+- "90s" → neon cyan, magenta, high contrast stops
+- "cottage core" → cream, dusty pink, sage green
+- "cyber" → dark base, neon accent, teal/magenta pops
+- "vaporwave" → pink, cyan, purple with distinct bands
+
+COLORS → Create depth, not flat swatches
+- "blue" → give it range (sky blue to deep navy, or navy to electric)
+- Single-color requests should still have 2-3 shades for richness
+
+ABSTRACT/POETIC → Interpret the imagery
+- "jasmine in rain" → soft white to pale green to misty gray-blue
+- "drowning fade" → light surface blue to deep dark ocean at bottom
+
+NONSENSE/GREETINGS → Default to something friendly
+- Warm, approachable colors
+- Gentle transitions
+- Nothing extreme
+
+Design principles:
+- Beautiful gradients have CONTRAST—avoid muddy middle tones
+- Think about gravity: light rises, darkness pools, heat radiates
+- Smooth transitions need space—don't cluster stops at 30, 35, 40
+- When in doubt: 3 stops at 0, 40-50, 100
+
+Return ONLY valid JSON array. No markdown, no explanation.
 Format: [{"color":"#RRGGBB","stop":number}, ...]`
 
   try {

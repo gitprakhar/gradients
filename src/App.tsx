@@ -131,7 +131,7 @@ const PRESET_RADIAL_GRADIENTS: Record<string, RadialGradientResult> = {
     centerColor: '#FF4D4D',
     outerColor: '#FFE5DC',
     midColors: [{ color: '#FF8E80', position: 40 }, { color: '#FFDAB7', position: 60 }],
-    shape: 'ellipse',
+    shape: 'circle',
     size: 'large',
     softness: 'soft',
     position: 'bottom-center',
@@ -235,6 +235,9 @@ export function App() {
   const [colorPickerFor, setColorPickerFor] = useState<number | null>(null)
   const [pickerPlaceAbove, setPickerPlaceAbove] = useState(false)
   const [showLinearLayer, setShowLinearLayer] = useState(gradientType === 'linear')
+  // Cache generated gradients to avoid regenerating when switching back
+  const [cachedLinearGradient, setCachedLinearGradient] = useState<{ position: number; color: string }[] | null>(null)
+  const [cachedRadialGradient, setCachedRadialGradient] = useState<RadialGradientResult | null>(null)
   const pillRefs = useRef<(HTMLDivElement | null)[]>([])
   const stopContainerRefs = useRef<(HTMLDivElement | null)[]>([])
   const pageRef = useRef<HTMLDivElement>(null)
@@ -358,7 +361,7 @@ export function App() {
   }
 
   const handleGenerateGradient = async (type: GradientType = gradientType) => {
-    const prompt = inputValue.trim()
+    const prompt = (inputValue.trim() || placeholderText).trim()
     if (!prompt || isGenerating) return
 
     if (animationFrameIdRef.current != null) {
@@ -373,6 +376,13 @@ export function App() {
     setGenerateError(null)
     setIsGenerating(true)
     setGradientType(type)
+
+    // Clear cached gradients when generating with a new prompt
+    // Only clear the cache if the prompt is different from the placeholder
+    if (inputValue.trim() && inputValue.trim() !== placeholderText) {
+      setCachedLinearGradient(null)
+      setCachedRadialGradient(null)
+    }
 
     if (type === 'radial') {
       // Capture the current radial gradient for animation
@@ -406,6 +416,9 @@ export function App() {
       try {
         const result = await generateRadialGradientFromPrompt(prompt)
         if (id !== generationIdRef.current) return
+
+        // Log radial gradient generation with full radial data
+        logGradientGeneration(prompt, result as unknown as Record<string, unknown>, 'radial')
 
         // Stop pre-animation
         if (animationFrameIdRef.current != null) {
@@ -444,6 +457,7 @@ export function App() {
             animationFrameIdRef.current = requestAnimationFrame(animateToRadialResult)
           } else {
             setRadialGradient(result)
+            setCachedRadialGradient(result)
             animationFrameIdRef.current = null
           }
         }
@@ -490,7 +504,7 @@ export function App() {
     try {
       const stops = await generateGradientFromPrompt(prompt)
       if (id !== generationIdRef.current) return
-      logGradientGeneration(prompt, stops)
+      logGradientGeneration(prompt, stops, 'linear')
       setHasCompletedFirstGeneration(true)
       if (animationFrameIdRef.current != null) {
         cancelAnimationFrame(animationFrameIdRef.current)
@@ -521,6 +535,7 @@ export function App() {
         } else {
           lastDisplayedStopsRef.current = newStops
           setColorStops(newStops)
+          setCachedLinearGradient(newStops)
           animationFrameIdRef.current = null
         }
       }
@@ -879,7 +894,18 @@ export function App() {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation()
-                          setGradientType('linear')
+                          if (hasCompletedFirstGeneration && gradientType !== 'linear') {
+                            // Check if we have a cached linear gradient
+                            if (cachedLinearGradient) {
+                              setColorStops(cachedLinearGradient)
+                              setGradientType('linear')
+                            } else {
+                              // Regenerate with linear if we've already generated and are switching types
+                              handleGenerateGradient('linear')
+                            }
+                          } else {
+                            setGradientType('linear')
+                          }
                         }}
                         disabled={isGenerating}
                         className={`px-3 py-1.5 text-xs font-sans transition-colors ${
@@ -894,7 +920,18 @@ export function App() {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation()
-                          setGradientType('radial')
+                          if (hasCompletedFirstGeneration && gradientType !== 'radial') {
+                            // Check if we have a cached radial gradient
+                            if (cachedRadialGradient) {
+                              setRadialGradient(cachedRadialGradient)
+                              setGradientType('radial')
+                            } else {
+                              // Regenerate with radial if we've already generated and are switching types
+                              handleGenerateGradient('radial')
+                            }
+                          } else {
+                            setGradientType('radial')
+                          }
                         }}
                         disabled={isGenerating}
                         className={`px-3 py-1.5 text-xs font-sans transition-colors ${
@@ -961,7 +998,18 @@ export function App() {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation()
-                          setGradientType('linear')
+                          if (hasCompletedFirstGeneration && gradientType !== 'linear') {
+                            // Check if we have a cached linear gradient
+                            if (cachedLinearGradient) {
+                              setColorStops(cachedLinearGradient)
+                              setGradientType('linear')
+                            } else {
+                              // Regenerate with linear if we've already generated and are switching types
+                              handleGenerateGradient('linear')
+                            }
+                          } else {
+                            setGradientType('linear')
+                          }
                         }}
                         disabled={isGenerating}
                         className={`px-3 py-1.5 text-xs font-sans transition-colors ${
@@ -976,7 +1024,18 @@ export function App() {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation()
-                          setGradientType('radial')
+                          if (hasCompletedFirstGeneration && gradientType !== 'radial') {
+                            // Check if we have a cached radial gradient
+                            if (cachedRadialGradient) {
+                              setRadialGradient(cachedRadialGradient)
+                              setGradientType('radial')
+                            } else {
+                              // Regenerate with radial if we've already generated and are switching types
+                              handleGenerateGradient('radial')
+                            }
+                          } else {
+                            setGradientType('radial')
+                          }
                         }}
                         disabled={isGenerating}
                         className={`px-3 py-1.5 text-xs font-sans transition-colors ${
@@ -1049,7 +1108,7 @@ export function App() {
                       handleCopyCSS()
                     }}
                     onMouseDown={(e) => e.stopPropagation()}
-                    className="px-3 py-1.5 text-xs font-sans transition-colors bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    className="hidden sm:block px-3 py-1.5 text-xs font-sans transition-colors bg-gray-100 text-gray-600 hover:bg-gray-200"
                   >
                     {copiedCSS ? 'Copied!' : 'Copy CSS'}
                   </button>
@@ -1061,7 +1120,7 @@ export function App() {
                         setIsEditingControls(!isEditingControls)
                       }}
                       onMouseDown={(e) => e.stopPropagation()}
-                      className="px-3 py-1.5 text-xs font-sans transition-colors bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      className="hidden sm:block px-3 py-1.5 text-xs font-sans transition-colors bg-gray-100 text-gray-600 hover:bg-gray-200"
                     >
                       {isEditingControls ? 'Done' : 'Edit'}
                     </button>

@@ -17,12 +17,21 @@ export interface GradientStopRow {
  */
 export function logGradientGeneration(
   userQuery: string,
-  gradientJson: GradientStopRow[]
+  gradientJson: GradientStopRow[] | Record<string, unknown>,
+  gradientType: 'linear' | 'radial' = 'linear'
 ): void {
-  if (!supabase || !import.meta.env.PROD) return
+  if (!supabase) return
+  if (!import.meta.env.PROD) return
 
   void supabase
     .from('gradient_generations')
-    .insert({ user_query: userQuery, gradient_json: gradientJson })
-    .then(() => {}, () => {})
+    .insert({
+      user_query: userQuery,
+      gradient_json: gradientJson,
+      gradient_type: gradientType
+    })
+    .then(
+      (result) => console.log('Logged successfully:', result),
+      (error) => console.error('Log error:', error)
+    )
 }
