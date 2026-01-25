@@ -231,6 +231,7 @@ export function App() {
   const [hasCompletedFirstGeneration, setHasCompletedFirstGeneration] = useState(() => !!galleryApplyRef.current)
   const [downloadOpen, setDownloadOpen] = useState(false)
   const [copiedCSS, setCopiedCSS] = useState(false)
+  const [isEditingControls, setIsEditingControls] = useState(false)
   const [colorPickerFor, setColorPickerFor] = useState<number | null>(null)
   const [pickerPlaceAbove, setPickerPlaceAbove] = useState(false)
   const [showLinearLayer, setShowLinearLayer] = useState(gradientType === 'linear')
@@ -291,6 +292,7 @@ export function App() {
   const handleLineClick = (e: React.MouseEvent) => {
     if (!hasCompletedFirstGeneration) return
     if (gradientType === 'radial') return
+    if (!isEditingControls) return
     if (!pageRef.current || dragging !== null) return
 
     // Only create new stop if plus cursor is showing
@@ -740,7 +742,7 @@ export function App() {
   }
 
   const handlePageMouseMove = (e: React.MouseEvent) => {
-    if (!hasCompletedFirstGeneration || gradientType === 'radial') {
+    if (!hasCompletedFirstGeneration || gradientType === 'radial' || !isEditingControls) {
       setShowPlusCursor(false)
       return
     }
@@ -1051,6 +1053,19 @@ export function App() {
                   >
                     {copiedCSS ? 'Copied!' : 'Copy CSS'}
                   </button>
+                  {gradientType === 'linear' && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setIsEditingControls(!isEditingControls)
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      className="px-3 py-1.5 text-xs font-sans transition-colors bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    >
+                      {isEditingControls ? 'Done' : 'Edit'}
+                    </button>
+                  )}
                 </div>
                 {generateError && (
                   <p className="text-xs font-sans text-red-600 mt-0.5" role="alert">
@@ -1059,8 +1074,8 @@ export function App() {
                 )}
               </div>
 
-              {/* Color stop controls: on the left side, hidden on mobile and when radial gradient is selected */}
-              {gradientType === 'linear' && <div className="hidden sm:block">
+              {/* Color stop controls: on the left side, hidden on mobile and when radial gradient is selected or not editing */}
+              {gradientType === 'linear' && isEditingControls && <div className="hidden sm:block">
               {colorStops.map((stop, index) => {
             const BOTTOM_MARGIN = 32
             const pageHeight = pageRef.current?.clientHeight || window.innerHeight
