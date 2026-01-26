@@ -177,15 +177,30 @@ function pickRandomPreset() {
 }
 
 const GALLERY_APPLY_KEY = 'galleryApply'
-function consumeGalleryApply(): { stops: { color: string; stop: number }[]; userQuery: string } | null {
+interface GalleryApplyData {
+  stops?: { color: string; stop: number }[]
+  radialData?: RadialGradientResult
+  gradientType?: 'linear' | 'radial'
+  userQuery: string
+}
+function consumeGalleryApply(): GalleryApplyData | null {
   try {
     const raw = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(GALLERY_APPLY_KEY) : null
     if (!raw) return null
     sessionStorage.removeItem(GALLERY_APPLY_KEY)
-    const data = JSON.parse(raw) as { stops?: unknown; userQuery?: string }
-    if (!data || !Array.isArray(data.stops) || data.stops.length === 0) return null
-    const stops = data.stops as { color: string; stop: number }[]
-    return { stops, userQuery: typeof data.userQuery === 'string' ? data.userQuery : '' }
+    const data = JSON.parse(raw) as Record<string, unknown>
+    if (!data) return null
+    const userQuery = typeof data.userQuery === 'string' ? data.userQuery : ''
+
+    // Radial gradient from gallery
+    if (data.gradientType === 'radial' && data.radialData && typeof data.radialData === 'object') {
+      return { radialData: data.radialData as RadialGradientResult, gradientType: 'radial', userQuery }
+    }
+    // Linear gradient from gallery
+    if (Array.isArray(data.stops) && data.stops.length > 0) {
+      return { stops: data.stops as { color: string; stop: number }[], userQuery }
+    }
+    return null
   } catch {
     return null
   }
@@ -213,9 +228,13 @@ export function App() {
     }
     return initialPresetRef.current!.stops
   })
-  const [gradientType, setGradientType] = useState<GradientType>('linear')
+  const [gradientType, setGradientType] = useState<GradientType>(() => {
+    const g = galleryApplyRef.current
+    return g?.gradientType === 'radial' ? 'radial' : 'linear'
+  })
   const [radialGradient, setRadialGradient] = useState<RadialGradientResult | null>(() => {
-    // Initialize with the preset's radial gradient for landing page
+    const g = galleryApplyRef.current
+    if (g?.gradientType === 'radial' && g.radialData) return g.radialData
     return initialPresetRef.current?.radial || null
   })
   const [dragging, setDragging] = useState<number | null>(null)

@@ -6,6 +6,16 @@ interface GradientStop {
   stop: number
 }
 
+interface RadialGradientData {
+  centerColor: string
+  outerColor: string
+  midColors?: { color: string; position: number }[]
+  shape?: string
+  position?: string
+  size?: string
+  softness?: string
+}
+
 interface LAB {
   L: number
   a: number
@@ -68,7 +78,7 @@ function hexToLab(hex: string): LAB {
   return { L, a, b: b_ }
 }
 
-function dominantLab(stops: GradientStop[]): LAB {
+function dominantLabFromStops(stops: GradientStop[]): LAB {
   const samples = [0, 0.25, 0.5, 0.75, 1].map((t) => hexToLab(sampleGradientAt(stops, t)))
   return {
     L: samples.reduce((s, p) => s + p.L, 0) / samples.length,
@@ -77,18 +87,44 @@ function dominantLab(stops: GradientStop[]): LAB {
   }
 }
 
+function dominantLabFromRadial(radial: RadialGradientData): LAB {
+  const colors = [radial.centerColor, radial.outerColor]
+  if (radial.midColors) colors.push(...radial.midColors.map((m) => m.color))
+  const labs = colors.map((c) => hexToLab(c))
+  return {
+    L: labs.reduce((s, p) => s + p.L, 0) / labs.length,
+    a: labs.reduce((s, p) => s + p.a, 0) / labs.length,
+    b: labs.reduce((s, p) => s + p.b, 0) / labs.length,
+  }
+}
+
+function itemDominantLab(item: GalleryItem): LAB {
+  if (item.gradientType === 'radial' && item.radialData) {
+    return dominantLabFromRadial(item.radialData)
+  }
+  return dominantLabFromStops(item.stops || [])
+}
+
 function deltaE76(a: LAB, b: LAB): number {
   return Math.sqrt((a.L - b.L) ** 2 + (a.a - b.a) ** 2 + (a.b - b.b) ** 2)
 }
 
 interface GalleryItem {
-  stops: GradientStop[]
+  stops?: GradientStop[]
+  radialData?: RadialGradientData
+  gradientType: 'linear' | 'radial'
   userQuery: string
+}
+
+function isRadialGradientData(obj: unknown): obj is RadialGradientData {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false
+  const o = obj as Record<string, unknown>
+  return typeof o.centerColor === 'string' && typeof o.outerColor === 'string'
 }
 
 function clusterBySimilarity(items: GalleryItem[]): GalleryItem[] {
   if (items.length <= 1) return [...items]
-  const labs = items.map((it) => dominantLab(it.stops))
+  const labs = items.map((it) => itemDominantLab(it))
   const placed = new Set<number>()
   const order: GalleryItem[] = [items[0]]
   placed.add(0)
@@ -119,6 +155,50 @@ function toCssGradient(stops: GradientStop[]): string {
   return `linear-gradient(to bottom, ${parts.join(', ')})`
 }
 
+function toRadialCssGradient(radial: RadialGradientData): string {
+  const { centerColor, outerColor, midColors, shape, position, size, softness } = radial
+
+  const positionMap: Record<string, string> = {
+    'center': 'center', 'top': 'center top', 'bottom': 'center bottom',
+    'left': 'left center', 'right': 'right center', 'top-left': 'left top',
+    'top-right': 'right top', 'bottom-left': 'left bottom', 'bottom-right': 'right bottom',
+    'bottom-center': 'center bottom', 'top-center': 'center top',
+    'off-left': '-20% center', 'off-right': '120% center',
+    'off-top': 'center -20%', 'off-bottom': 'center 120%',
+  }
+  const cssPosition = positionMap[position || 'center'] || 'center'
+
+  const sizeMap: Record<string, string> = {
+    'small': 'closest-side', 'medium': 'farthest-corner', 'large': 'farthest-side',
+  }
+  const cssSize = sizeMap[size || 'medium'] || 'farthest-corner'
+
+  const softnessStops: Record<string, { center: number; outer: number }> = {
+    'sharp': { center: 0, outer: 60 }, 'soft': { center: 0, outer: 85 }, 'ultra-soft': { center: 0, outer: 100 },
+  }
+  const { center: centerStop, outer: outerStop } = softnessStops[softness || 'soft'] || softnessStops['soft']
+
+  const stops: string[] = [`${centerColor} ${centerStop}%`]
+  if (midColors && midColors.length > 0) {
+    const sortedMid = [...midColors].sort((a, b) => a.position - b.position)
+    sortedMid.forEach((m) => {
+      const scaledPos = centerStop + (m.position / 100) * (outerStop - centerStop)
+      stops.push(`${m.color} ${scaledPos}%`)
+    })
+  }
+  stops.push(`${outerColor} ${outerStop}%`)
+  if (outerStop < 100) stops.push(`${outerColor} 100%`)
+
+  return `radial-gradient(${shape || 'circle'} ${cssSize} at ${cssPosition}, ${stops.join(', ')})`
+}
+
+function itemCssBackground(item: GalleryItem): string {
+  if (item.gradientType === 'radial' && item.radialData) {
+    return toRadialCssGradient(item.radialData)
+  }
+  return toCssGradient(item.stops || [])
+}
+
 export default function Gallery({ onBack }: { onBack: () => void }) {
   const [items, setItems] = useState<GalleryItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -134,7 +214,7 @@ export default function Gallery({ onBack }: { onBack: () => void }) {
     }
     supabase
       .from('gradient_generations')
-      .select('gradient_json, user_query')
+      .select('gradient_json, user_query, gradient_type')
       .order('created_at', { ascending: false })
       .limit(500)
       .then(({ data, error: e }) => {
@@ -143,15 +223,38 @@ export default function Gallery({ onBack }: { onBack: () => void }) {
           setError(e.message)
           return
         }
-        const valid: GalleryItem[] = (data ?? [])
-          .map((r) => ({
-            stops: r?.gradient_json as unknown,
-            userQuery: (r?.user_query ?? '') as string,
-          }))
-          .filter((x): x is GalleryItem => Array.isArray(x.stops) && x.stops.length > 0)
+        const valid: GalleryItem[] = []
+        for (const r of data ?? []) {
+          const json = r?.gradient_json as unknown
+          const type = (r?.gradient_type ?? 'linear') as string
+          const userQuery = (r?.user_query ?? '') as string
+
+          if (type === 'radial' && isRadialGradientData(json)) {
+            valid.push({ radialData: json, gradientType: 'radial', userQuery })
+          } else if (Array.isArray(json) && json.length > 0) {
+            valid.push({ stops: json as GradientStop[], gradientType: 'linear', userQuery })
+          }
+        }
         setItems(valid)
       })
   }, [])
+
+  const handleApply = (item: GalleryItem) => {
+    try {
+      if (item.gradientType === 'radial' && item.radialData) {
+        sessionStorage.setItem(
+          'galleryApply',
+          JSON.stringify({ radialData: item.radialData, gradientType: 'radial', userQuery: item.userQuery || '' })
+        )
+      } else {
+        sessionStorage.setItem(
+          'galleryApply',
+          JSON.stringify({ stops: item.stops, userQuery: item.userQuery || '' })
+        )
+      }
+    } catch {}
+    onBack()
+  }
 
   return (
     <div className="w-full h-full min-h-0 overflow-auto bg-gray-100 relative">
@@ -181,25 +284,11 @@ export default function Gallery({ onBack }: { onBack: () => void }) {
                 key={i}
                 role="button"
                 tabIndex={0}
-                onClick={() => {
-                  try {
-                    sessionStorage.setItem(
-                      'galleryApply',
-                      JSON.stringify({ stops: item.stops, userQuery: item.userQuery || '' })
-                    )
-                  } catch {}
-                  onBack()
-                }}
+                onClick={() => handleApply(item)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
-                    try {
-                      sessionStorage.setItem(
-                        'galleryApply',
-                        JSON.stringify({ stops: item.stops, userQuery: item.userQuery || '' })
-                      )
-                    } catch {}
-                    onBack()
+                    handleApply(item)
                   }
                 }}
                 className="flex flex-col sm:block cursor-pointer"
@@ -207,7 +296,7 @@ export default function Gallery({ onBack }: { onBack: () => void }) {
                 {/* Gradient: 16:9 on mobile, square on desktop */}
                 <div
                   className="group relative aspect-video sm:aspect-square rounded-none shadow-sm ring-1 ring-black/5"
-                  style={{ background: toCssGradient(item.stops) }}
+                  style={{ background: itemCssBackground(item) }}
                 >
                   {/* Desktop: hover tooltip below */}
                   {item.userQuery ? (
