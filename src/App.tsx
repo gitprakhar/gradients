@@ -889,7 +889,10 @@ export function App() {
               onMouseDown={(e) => e.stopPropagation()}
             >
               <div className="flex flex-col items-center gap-2">
-                <div className="bg-white/80 backdrop-blur-xl shadow" style={{ width: 320 }}>
+                <div
+                  className="bg-white/80 backdrop-blur-xl shadow"
+                  style={{ width: 'clamp(280px, 28vw, 520px)', maxWidth: '90vw' }}
+                >
                   <div className="px-3 py-3">
                     <input
                       ref={inputRef}
@@ -994,7 +997,10 @@ export function App() {
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
               >
-                <div className="bg-white/80 backdrop-blur-xl shadow" style={{ width: 320 }}>
+                <div
+                  className="bg-white/80 backdrop-blur-xl shadow"
+                  style={{ width: 'clamp(280px, 28vw, 520px)', maxWidth: '90vw' }}
+                >
                   <div className="px-3 py-3">
                     <input
                       ref={inputRef}
