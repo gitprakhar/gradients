@@ -66,6 +66,13 @@
       <div class="preview" id="preview"></div>
       <input id="prompt" type="text" placeholder="Search a vibe…" />
       <div class="row">
+        <label for="type" class="hint" style="align-self:center;">Type</label>
+        <select id="type" style="flex:1;height:32px;border-radius:8px;border:1px solid rgba(0,0,0,0.12);padding:0 8px;background:white;">
+          <option value="linear" selected>Linear</option>
+          <option value="radial">Radial</option>
+        </select>
+      </div>
+      <div class="row">
         <button id="generate">Generate</button>
         <button id="apply" disabled>Apply</button>
       </div>
@@ -82,8 +89,10 @@
       const generateBtn = document.getElementById('generate');
       const applyBtn = document.getElementById('apply');
       const statusEl = document.getElementById('status');
+      const typeEl = document.getElementById('type');
 
       let lastStops = null;
+      let lastRadialPosition = 'center';
 
       function setStatus(text) {
         statusEl.textContent = text || '';
@@ -103,19 +112,244 @@
         return stops.filter((s) => /^#[0-9A-F]{6}$/i.test(s.color));
       }
 
-      function toCssGradient(stops) {
+      function toCssGradient(stops, type) {
         const parts = stops.map((s) => `${s.color} ${s.stop}%`);
+        if (type === 'radial') {
+          return `radial-gradient(circle at center, ${parts.join(', ')})`;
+        }
         return `linear-gradient(180deg, ${parts.join(', ')})`;
       }
 
-      async function generateGradient(prompt) {
-        const systemPrompt = `You generate beautiful linear gradients that capture the essence, mood, and color palette of ANY concept.
+      function linearSystemPrompt() {
+        return `You generate beautiful linear gradients that capture the essence, mood, and color palette of ANY concept.
+
+A linear gradient flows from top to bottom, like light falling, atmosphere shifting, or energy moving. Your job is to translate ANY input into a visually stunning gradient.
+
 Output format:
 [{"color": "#RRGGBB", "stop": 0}, {"color": "#RRGGBB", "stop": 100}]
+
 Rules:
 - Generate 2-4 color stops
+- "stop" is position: 0 = top, 100 = bottom
 - First stop must be 0, last must be 100
-Return ONLY valid JSON array.`;
+- Middle stops (e.g., 30, 60) create richer transitions
+
+Interpretation guide:
+
+EMOTIONS → Translate feeling into color flow
+- Warm emotions (love, happy, hope) → warm colors flowing down, light to rich
+- Dark emotions (hate, anxiety, drowning) → heavy darks at top or bottom, saturated tones
+- Calm emotions → muted tones, gentle transitions, no harsh jumps
+
+PLACES → Capture the iconic color palette and atmosphere
+- Cities → their vibe (Mumbai = golden sun over ocean blue, LA = pink haze to deep purple)
+- Nature locations → sky-to-ground logic (mountains = pale sky to deep forest, desert = hot white to sand orange)
+- Countries → flag colors OR iconic landscape colors
+
+NATURE/WEATHER → Think like a sky or landscape
+- Time of day → sunrise/sunset warm at bottom rising to cool; night dark throughout
+- Weather → storms are heavy grays/blues; snow is soft whites with cool blue shadows
+- Seasons → summer is bright and warm; winter is cool and muted
+
+OBJECTS → Extract the essential color palette
+- Focus on 2-3 most recognizable colors
+- Arrange them in a way that feels natural (e.g., apple = deep red to bright red to green stem hint)
+
+AESTHETICS/VIBES → Match the era or style
+- "90s" → neon cyan, magenta, high contrast stops
+- "cottage core" → cream, dusty pink, sage green
+- "cyber" → dark base, neon accent, teal/magenta pops
+- "vaporwave" → pink, cyan, purple with distinct bands
+
+COLORS → Create depth, not flat swatches
+- "blue" → give it range (sky blue to deep navy, or navy to electric)
+- Single-color requests should still have 2-3 shades for richness
+
+ABSTRACT/POETIC → Interpret the imagery
+- "jasmine in rain" → soft white to pale green to misty gray-blue
+- "drowning fade" → light surface blue to deep dark ocean at bottom
+
+NONSENSE/GREETINGS → Default to something friendly
+- Warm, approachable colors
+- Gentle transitions
+- Nothing extreme
+
+Design principles:
+- Beautiful gradients have CONTRAST—avoid muddy middle tones
+- Think about gravity: light rises, darkness pools, heat radiates
+- Smooth transitions need space—don't cluster stops at 30, 35, 40
+- When in doubt: 3 stops at 0, 40-50, 100
+
+Return ONLY valid JSON array. No markdown, no explanation.
+Format: [{"color":"#RRGGBB","stop":number}, ...]`;
+      }
+
+      function radialSystemPrompt() {
+        return `You generate beautiful radial gradients that capture the essence, mood, and color palette of ANY concept.
+
+A radial gradient is a glow emanating from a focal point—like light, energy, or atmosphere. Your job is to translate ANY input into a visually stunning gradient.
+
+Output format:
+{
+  "centerColor": "#RRGGBB",      // focal point color
+  "outerColor": "#RRGGBB",       // edge/background color
+  "midColors": [{"color": "#RRGGBB", "position": 20-80}],  // optional, for richer gradients
+  "position": "center" | "top-center" | "bottom-center" | "top-left" | "top-right" | "bottom-left" | "bottom-right",
+  "size": "small" | "medium" | "large",
+  "softness": "sharp" | "soft" | "ultra-soft",
+  "shape": "circle" | "ellipse"
+}
+
+Interpretation guide:
+
+EMOTIONS → Translate feeling into color temperature, intensity, and softness
+- Warm emotions (love, happy, hope) → warm colors, soft edges, centered or rising
+- Dark emotions (hate, anxiety, drowning) → deep/saturated colors, can be sharp, darker edges
+- Calm emotions → muted tones, ultra-soft, gentle transitions
+
+PLACES → Capture the iconic color palette and atmosphere, not literal geography
+- Cities → their vibe (Mumbai = vibrant yellows + ocean blues, Dubai = gold + deep blue night)
+- Nature locations → dominant landscape colors (Yosemite = forest green + granite gray + sky)
+- Countries → can reference flag colors OR iconic landscapes
+
+NATURE/WEATHER → Atmospheric interpretation
+- Time of day → position the "light source" appropriately (sunset = bottom, morning = top-right)
+- Weather → snow is soft whites, storms are dark and sharp
+- Elements → fire rises (bottom-center), water pools (center or bottom)
+
+OBJECTS → Extract the essential color palette
+- Focus on 2-3 most recognizable colors
+- Consider the object's texture (soft blanket = soft gradient, sharp pencil = defined stops)
+
+AESTHETICS/VIBES → Match the era or style's color language
+- "90s" → neon, cyan, magenta, high contrast
+- "cottage core" → muted greens, dusty pinks, cream
+- "cyber" → dark bases, neon accents, teals and magentas
+
+COLORS → Create depth and richness, not flat swatches
+- "blue" shouldn't be just blue—give it depth (deep navy center fading to bright cyan, or vice versa)
+- Add subtle variations to make single-color requests interesting
+
+ABSTRACT/POETIC → Interpret the imagery and mood
+- "jasmine in rain" → soft whites, pale greens, gray-blue mist
+- "drowning fade" → deep ocean blues, darkness pulling down
+
+NONSENSE/GREETINGS → Default to something friendly and universally appealing
+- Warm, approachable colors
+- Soft gradients
+- Nothing too extreme
+
+QUESTIONS → Answer visually
+- "What does X look like" → your best interpretation of X's color essence
+
+Size and softness guidelines:
+- "small" + "sharp": intense, focused energy (neon signs, spotlights, concentrated emotions like anxiety)
+- "medium" + "soft": balanced, most versatile (most objects, places, general moods)
+- "large" + "ultra-soft": atmospheric, ambient (skies, weather, calm emotions, time of day)
+
+Don't default to large/ultra-soft. Match the intensity of the concept:
+- "fire" → small-medium, sharp-soft (concentrated heat)
+- "sunset" → large, ultra-soft (atmospheric)
+- "neon" → small, sharp (focused glow)
+- "ocean" → large, soft (expansive but with presence)
+- "anxiety" → medium, sharp (tight, uncomfortable)
+- "hope" → medium-large, soft (warm but not overwhelming)
+
+Design principles:
+- Beautiful gradients have CONTRAST—don't make everything muddy middle tones
+- Position matters: light sources should feel natural (suns rise/set, glows emanate from logical places)
+- When in doubt, go with "position": "center", "size": "medium", "softness": "soft"
+
+Return ONLY valid JSON. No markdown, no explanation.`;
+      }
+
+      function parseLinearResponse(content) {
+        const codeBlock = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (codeBlock) content = codeBlock[1].trim();
+        let jsonMatch = content.match(/\[[\s\S]*\]/);
+        if (!jsonMatch) {
+          const trimmed = content.trim();
+          if (trimmed.startsWith('[') && trimmed.endsWith(']')) jsonMatch = [trimmed];
+        }
+        if (!jsonMatch) throw new Error('No JSON array in response');
+        let parsed;
+        try {
+          parsed = JSON.parse(jsonMatch[0]);
+        } catch {
+          throw new Error('Could not parse JSON');
+        }
+        const stops = normalizeStops(parsed);
+        if (stops.length < 2) throw new Error('Need at least 2 color stops');
+        return stops.sort((a, b) => a.stop - b.stop);
+      }
+
+      function parseRadialResponse(content) {
+        const codeBlock = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (codeBlock) content = codeBlock[1].trim();
+        let jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          const trimmed = content.trim();
+          if (trimmed.startsWith('{') && trimmed.endsWith('}')) jsonMatch = [trimmed];
+        }
+        if (!jsonMatch) throw new Error('No JSON object in response');
+        let obj;
+        try {
+          obj = JSON.parse(jsonMatch[0]);
+        } catch {
+          throw new Error('Could not parse JSON');
+        }
+        const centerColor = String(obj.centerColor || '').trim();
+        const outerColor = String(obj.outerColor || '').trim();
+        if (!centerColor || !outerColor) {
+          throw new Error('Invalid radial response: missing centerColor/outerColor');
+        }
+
+        const normalizeColor = (c) => {
+          let color = String(c || '').trim();
+          if (!color.startsWith('#')) color = '#' + color;
+          if (color.length === 4) {
+            color = '#' + color[1] + color[1] + color[2] + color[2] + color[3] + color[3];
+          }
+          return color.toUpperCase();
+        };
+
+        const softness = String(obj.softness || 'soft');
+        const softnessStops = {
+          'sharp': { center: 0, outer: 60 },
+          'soft': { center: 0, outer: 85 },
+          'ultra-soft': { center: 0, outer: 100 },
+        };
+        const { center: centerStop, outer: outerStop } = softnessStops[softness] || softnessStops['soft'];
+
+        const stops = [];
+        stops.push({ color: normalizeColor(centerColor), stop: centerStop });
+
+        if (Array.isArray(obj.midColors)) {
+          const mid = obj.midColors
+            .map((m) => ({
+              color: normalizeColor(m.color),
+              position: Math.max(0, Math.min(100, Number(m.position) || 50)),
+            }))
+            .sort((a, b) => a.position - b.position);
+          for (const m of mid) {
+            const scaledPos = centerStop + (m.position / 100) * (outerStop - centerStop);
+            stops.push({ color: m.color, stop: Math.round(scaledPos) });
+          }
+        }
+
+        stops.push({ color: normalizeColor(outerColor), stop: outerStop });
+        if (outerStop < 100) {
+          stops.push({ color: normalizeColor(outerColor), stop: 100 });
+        }
+
+        return {
+          stops: normalizeStops(stops).sort((a, b) => a.stop - b.stop),
+          position: typeof obj.position === 'string' ? obj.position : 'center',
+        };
+      }
+
+      async function generateGradient(prompt, type) {
+        const systemPrompt = type === 'radial' ? radialSystemPrompt() : linearSystemPrompt();
 
         const res = await fetch(API_URL, {
           method: 'POST',
@@ -137,36 +371,24 @@ Return ONLY valid JSON array.`;
 
         const data = await res.json();
         let content = data.message?.content || data.content || '';
-        const codeBlock = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-        if (codeBlock) content = codeBlock[1].trim();
-        let jsonMatch = content.match(/\[[\s\S]*\]/);
-        if (!jsonMatch) {
-          const trimmed = content.trim();
-          if (trimmed.startsWith('[') && trimmed.endsWith(']')) jsonMatch = [trimmed];
-        }
-        if (!jsonMatch) throw new Error('No JSON array in response');
-
-        let parsed;
-        try {
-          parsed = JSON.parse(jsonMatch[0]);
-        } catch {
-          throw new Error('Could not parse JSON');
-        }
-        const stops = normalizeStops(parsed);
-        if (stops.length < 2) throw new Error('Need at least 2 color stops');
-        return stops.sort((a, b) => a.stop - b.stop);
+        if (type === 'radial') return parseRadialResponse(content);
+        return { stops: parseLinearResponse(content), position: 'center' };
       }
 
       generateBtn.onclick = async () => {
         const q = promptEl.value.trim();
         if (!q) return;
+        promptEl.blur();
         setStatus('Generating…');
         generateBtn.disabled = true;
         applyBtn.disabled = true;
         try {
-          const stops = await generateGradient(q);
-          lastStops = stops;
-          preview.style.background = toCssGradient(stops);
+          const type = typeEl.value === 'radial' ? 'radial' : 'linear';
+          const result = await generateGradient(q, type);
+          lastStops = result.stops;
+          // Keep Figma behavior aligned with preview; ignore model position for now.
+          lastRadialPosition = 'center';
+          preview.style.background = toCssGradient(result.stops, type);
           setStatus('Ready');
           applyBtn.disabled = false;
         } catch (err) {
@@ -178,7 +400,9 @@ Return ONLY valid JSON array.`;
 
       applyBtn.onclick = () => {
         if (!lastStops) return;
-        parent.postMessage({ pluginMessage: { type: 'apply-gradient', stops: lastStops } }, '*');
+        promptEl.blur();
+        const gradientType = typeEl.value === 'radial' ? 'radial' : 'linear';
+        parent.postMessage({ pluginMessage: { type: 'apply-gradient', stops: lastStops, gradientType, radialPosition: lastRadialPosition } }, '*');
       };
     </script>
   </body>
