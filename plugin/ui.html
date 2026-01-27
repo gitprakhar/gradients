@@ -1,0 +1,185 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vibe Gradients</title>
+    <style>
+      :root { color-scheme: light; }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f6f6f7;
+        color: #111;
+      }
+      .wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 12px;
+      }
+      .preview {
+        height: 72px;
+        border-radius: 6px;
+        background: linear-gradient(180deg, #e6e6e6, #cfcfcf);
+        border: 1px solid rgba(0,0,0,0.06);
+      }
+      input[type="text"] {
+        height: 36px;
+        padding: 0 10px;
+        border-radius: 8px;
+        border: 1px solid rgba(0,0,0,0.12);
+        background: white;
+        font-size: 14px;
+      }
+      button {
+        height: 36px;
+        border: 0;
+        border-radius: 8px;
+        background: #111;
+        color: white;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+      }
+      .status {
+        min-height: 18px;
+        font-size: 12px;
+        color: #666;
+      }
+      .hint {
+        font-size: 11px;
+        color: #999;
+      }
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="preview" id="preview"></div>
+      <input id="prompt" type="text" placeholder="Search a vibe…" />
+      <div class="row">
+        <button id="generate">Generate</button>
+        <button id="apply" disabled>Apply</button>
+      </div>
+      <div class="status" id="status"></div>
+      <div class="hint">Set your API in <code>plugin/ui.html</code> and <code>plugin/manifest.json</code>.</div>
+    </div>
+
+    <script>
+      const API_URL = 'https://anycolorsyoulike.vercel.app/api/ollama/chat';
+      const MODEL = 'gpt-oss:20b-cloud';
+
+      const preview = document.getElementById('preview');
+      const promptEl = document.getElementById('prompt');
+      const generateBtn = document.getElementById('generate');
+      const applyBtn = document.getElementById('apply');
+      const statusEl = document.getElementById('status');
+
+      let lastStops = null;
+
+      function setStatus(text) {
+        statusEl.textContent = text || '';
+      }
+
+      function normalizeStops(raw) {
+        if (!Array.isArray(raw)) return [];
+        const stops = raw.map((s) => {
+          let color = String(s.color || '').trim();
+          if (!color.startsWith('#')) color = '#' + color;
+          if (color.length === 4) {
+            color = '#' + color[1] + color[1] + color[2] + color[2] + color[3] + color[3];
+          }
+          const stop = Math.max(0, Math.min(100, Number(s.stop) || 0));
+          return { color: color.toUpperCase(), stop: Math.round(stop) };
+        });
+        return stops.filter((s) => /^#[0-9A-F]{6}$/i.test(s.color));
+      }
+
+      function toCssGradient(stops) {
+        const parts = stops.map((s) => `${s.color} ${s.stop}%`);
+        return `linear-gradient(180deg, ${parts.join(', ')})`;
+      }
+
+      async function generateGradient(prompt) {
+        const systemPrompt = `You generate beautiful linear gradients that capture the essence, mood, and color palette of ANY concept.
+Output format:
+[{"color": "#RRGGBB", "stop": 0}, {"color": "#RRGGBB", "stop": 100}]
+Rules:
+- Generate 2-4 color stops
+- First stop must be 0, last must be 100
+Return ONLY valid JSON array.`;
+
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: MODEL,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: `Generate a gradient for: ${prompt}` },
+            ],
+            stream: false,
+          }),
+        });
+
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || `Request failed (${res.status})`);
+        }
+
+        const data = await res.json();
+        let content = data.message?.content || data.content || '';
+        const codeBlock = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (codeBlock) content = codeBlock[1].trim();
+        let jsonMatch = content.match(/\[[\s\S]*\]/);
+        if (!jsonMatch) {
+          const trimmed = content.trim();
+          if (trimmed.startsWith('[') && trimmed.endsWith(']')) jsonMatch = [trimmed];
+        }
+        if (!jsonMatch) throw new Error('No JSON array in response');
+
+        let parsed;
+        try {
+          parsed = JSON.parse(jsonMatch[0]);
+        } catch {
+          throw new Error('Could not parse JSON');
+        }
+        const stops = normalizeStops(parsed);
+        if (stops.length < 2) throw new Error('Need at least 2 color stops');
+        return stops.sort((a, b) => a.stop - b.stop);
+      }
+
+      generateBtn.onclick = async () => {
+        const q = promptEl.value.trim();
+        if (!q) return;
+        setStatus('Generating…');
+        generateBtn.disabled = true;
+        applyBtn.disabled = true;
+        try {
+          const stops = await generateGradient(q);
+          lastStops = stops;
+          preview.style.background = toCssGradient(stops);
+          setStatus('Ready');
+          applyBtn.disabled = false;
+        } catch (err) {
+          setStatus(String(err.message || err));
+        } finally {
+          generateBtn.disabled = false;
+        }
+      };
+
+      applyBtn.onclick = () => {
+        if (!lastStops) return;
+        parent.postMessage({ pluginMessage: { type: 'apply-gradient', stops: lastStops } }, '*');
+      };
+    </script>
+  </body>
+</html>
