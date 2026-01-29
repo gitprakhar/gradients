@@ -413,9 +413,14 @@ export function App() {
     setColorStops(newStops)
   }
 
-  const handleGenerateGradient = async (type: GradientType = gradientType) => {
+  const handleGenerateGradient = async (
+    type: GradientType = gradientType,
+    opts?: { origin?: 'switch' | 'user'; preAnimation?: 'full' | 'subtle' | 'none' }
+  ) => {
     const prompt = (inputValue.trim() || placeholderText).trim()
     if (!prompt || isGenerating) return
+
+    const preAnimation = opts?.preAnimation ?? 'full'
 
     if (animationFrameIdRef.current != null) {
       cancelAnimationFrame(animationFrameIdRef.current)
@@ -443,21 +448,23 @@ export function App() {
       preGenerateRadialRef.current = currentRadial
 
       // Pre-response: hue rotation animation while waiting for API
-      if (currentRadial) {
+      if (currentRadial && preAnimation !== 'none') {
+        const hueSpeed = preAnimation === 'subtle' ? 0.02 : 0.08
+        const hueMix = preAnimation === 'subtle' ? 0.25 : 1
         const rafState = { start: 0 }
         const animatePreRadial = (now: number) => {
           if (!rafState.start) rafState.start = now
           const elapsed = now - rafState.start
-          const hueOffset = (elapsed * 0.08) % 360
+          const hueOffset = (elapsed * hueSpeed) % 360
           const base = preGenerateRadialRef.current
           if (base) {
             setRadialGradient({
               ...base,
-              centerColor: rotateHue(base.centerColor, hueOffset),
-              outerColor: rotateHue(base.outerColor, hueOffset),
+              centerColor: lerpHex(base.centerColor, rotateHue(base.centerColor, hueOffset), hueMix),
+              outerColor: lerpHex(base.outerColor, rotateHue(base.outerColor, hueOffset), hueMix),
               midColors: base.midColors?.map(m => ({
                 ...m,
-                color: rotateHue(m.color, hueOffset),
+                color: lerpHex(m.color, rotateHue(m.color, hueOffset), hueMix),
               })),
             })
           }
@@ -539,20 +546,24 @@ export function App() {
 
     // Linear gradient logic (existing)
     // Pre-response: colors start changing immediately (hue rotation) while the model runs
-    const rafState = { start: 0 }
-    const animatePre = (now: number) => {
-      if (!rafState.start) rafState.start = now
-      const elapsed = now - rafState.start
-      const hueOffset = (elapsed * 0.08) % 360
-      const next = preGenerateStopsRef.current.map((s) => ({
-        position: s.position,
-        color: rotateHue(s.color, hueOffset),
-      }))
-      lastDisplayedStopsRef.current = next
-      setColorStops(next)
+    if (preAnimation !== 'none') {
+      const hueSpeed = preAnimation === 'subtle' ? 0.02 : 0.08
+      const hueMix = preAnimation === 'subtle' ? 0.25 : 1
+      const rafState = { start: 0 }
+      const animatePre = (now: number) => {
+        if (!rafState.start) rafState.start = now
+        const elapsed = now - rafState.start
+        const hueOffset = (elapsed * hueSpeed) % 360
+        const next = preGenerateStopsRef.current.map((s) => ({
+          position: s.position,
+          color: lerpHex(s.color, rotateHue(s.color, hueOffset), hueMix),
+        }))
+        lastDisplayedStopsRef.current = next
+        setColorStops(next)
+        animationFrameIdRef.current = requestAnimationFrame(animatePre)
+      }
       animationFrameIdRef.current = requestAnimationFrame(animatePre)
     }
-    animationFrameIdRef.current = requestAnimationFrame(animatePre)
 
     try {
       const stops = await generateGradientFromPrompt(prompt)
@@ -751,26 +762,46 @@ export function App() {
 
   const switchToLinear = () => {
     if (gradientType === 'linear') return
-    if (gradientType === 'radial' && radialGradient) {
-      const mapped = radialToLinearStops(radialGradient)
-      setColorStops(mapped)
-      setCachedLinearGradient(mapped)
-    } else if (cachedLinearGradient) {
-      setColorStops(cachedLinearGradient)
+    setShowLinearLayer(true)
+    if (!hasCompletedFirstGeneration) {
+      const presetStops = initialPresetRef.current?.stops || []
+      if (presetStops.length > 0) {
+        setColorStops(presetStops)
+      }
+      setGradientType('linear')
+      return
     }
+
+    if (cachedLinearGradient) {
+      setColorStops(cachedLinearGradient)
+      setGradientType('linear')
+      return
+    }
+    // No cache yet: generate a new linear gradient for the current prompt.
     setGradientType('linear')
+    handleGenerateGradient('linear', { origin: 'switch', preAnimation: 'full' })
   }
 
   const switchToRadial = () => {
     if (gradientType === 'radial') return
-    if (gradientType === 'linear') {
-      const mapped = linearStopsToRadial(colorStopsRef.current)
-      setRadialGradient(mapped)
-      setCachedRadialGradient(mapped)
-    } else if (cachedRadialGradient) {
-      setRadialGradient(cachedRadialGradient)
+    setShowLinearLayer(false)
+    if (!hasCompletedFirstGeneration) {
+      const presetRadial = initialPresetRef.current?.radial || null
+      if (presetRadial) {
+        setRadialGradient(presetRadial)
+      }
+      setGradientType('radial')
+      return
     }
+
+    if (cachedRadialGradient) {
+      setRadialGradient(cachedRadialGradient)
+      setGradientType('radial')
+      return
+    }
+    // No cache yet: generate a new radial gradient for the current prompt.
     setGradientType('radial')
+    handleGenerateGradient('radial', { origin: 'switch', preAnimation: 'full' })
   }
 
   const gradientString = () => {
@@ -889,56 +920,54 @@ export function App() {
       onMouseMove={handlePageMouseMove}
       onMouseLeave={() => setShowPlusCursor(false)}
     >
-      {/* Crossfade layers for gradient type switching on homepage */}
-      {!hasCompletedFirstGeneration && (
-        <>
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              background: (() => {
-                const sortedStops = [...colorStops].sort((a, b) => a.position - b.position)
-                return `linear-gradient(to bottom, ${sortedStops.map(s => `${s.color} ${s.position}%`).join(', ')})`
-              })(),
-              opacity: showLinearLayer ? 1 : 0,
-              transition: 'opacity 0.6s ease-in-out',
-            }}
-          />
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              background: radialGradient ? (() => {
-                const { centerColor, outerColor, midColors, shape, position, size, softness } = radialGradient
-                const positionMap: Record<string, string> = {
-                  'center': 'center', 'top': 'center top', 'bottom': 'center bottom',
-                  'left': 'left center', 'right': 'right center', 'top-left': 'left top',
-                  'top-right': 'right top', 'bottom-left': 'left bottom', 'bottom-right': 'right bottom',
-                  'bottom-center': 'center bottom', 'top-center': 'center top',
-                }
-                const cssPosition = positionMap[position || 'center'] || 'center'
-                const sizeMap: Record<string, string> = { 'small': 'closest-side', 'medium': 'farthest-corner', 'large': 'farthest-side' }
-                const cssSize = sizeMap[size || 'medium'] || 'farthest-corner'
-                const softnessStops: Record<string, { center: number; outer: number }> = {
-                  'sharp': { center: 0, outer: 60 }, 'soft': { center: 0, outer: 85 }, 'ultra-soft': { center: 0, outer: 100 },
-                }
-                const { center: centerStop, outer: outerStop } = softnessStops[softness || 'soft'] || softnessStops['soft']
-                const stops: string[] = [`${centerColor} ${centerStop}%`]
-                if (midColors && midColors.length > 0) {
-                  const sortedMid = [...midColors].sort((a, b) => a.position - b.position)
-                  sortedMid.forEach((m) => {
-                    const scaledPos = centerStop + (m.position / 100) * (outerStop - centerStop)
-                    stops.push(`${m.color} ${scaledPos}%`)
-                  })
-                }
-                stops.push(`${outerColor} ${outerStop}%`)
-                if (outerStop < 100) stops.push(`${outerColor} 100%`)
-                return `radial-gradient(${shape || 'circle'} ${cssSize} at ${cssPosition}, ${stops.join(', ')})`
-              })() : 'transparent',
-              opacity: showLinearLayer ? 0 : 1,
-              transition: 'opacity 0.6s ease-in-out',
-            }}
-          />
-        </>
-      )}
+      {/* Crossfade layers for gradient type switching */}
+      <>
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: (() => {
+              const sortedStops = [...colorStops].sort((a, b) => a.position - b.position)
+              return `linear-gradient(to bottom, ${sortedStops.map(s => `${s.color} ${s.position}%`).join(', ')})`
+            })(),
+            opacity: showLinearLayer ? 1 : 0,
+            transition: 'opacity 0.6s ease-in-out',
+          }}
+        />
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: radialGradient ? (() => {
+              const { centerColor, outerColor, midColors, shape, position, size, softness } = radialGradient
+              const positionMap: Record<string, string> = {
+                'center': 'center', 'top': 'center top', 'bottom': 'center bottom',
+                'left': 'left center', 'right': 'right center', 'top-left': 'left top',
+                'top-right': 'right top', 'bottom-left': 'left bottom', 'bottom-right': 'right bottom',
+                'bottom-center': 'center bottom', 'top-center': 'center top',
+              }
+              const cssPosition = positionMap[position || 'center'] || 'center'
+              const sizeMap: Record<string, string> = { 'small': 'closest-side', 'medium': 'farthest-corner', 'large': 'farthest-side' }
+              const cssSize = sizeMap[size || 'medium'] || 'farthest-corner'
+              const softnessStops: Record<string, { center: number; outer: number }> = {
+                'sharp': { center: 0, outer: 60 }, 'soft': { center: 0, outer: 85 }, 'ultra-soft': { center: 0, outer: 100 },
+              }
+              const { center: centerStop, outer: outerStop } = softnessStops[softness || 'soft'] || softnessStops['soft']
+              const stops: string[] = [`${centerColor} ${centerStop}%`]
+              if (midColors && midColors.length > 0) {
+                const sortedMid = [...midColors].sort((a, b) => a.position - b.position)
+                sortedMid.forEach((m) => {
+                  const scaledPos = centerStop + (m.position / 100) * (outerStop - centerStop)
+                  stops.push(`${m.color} ${scaledPos}%`)
+                })
+              }
+              stops.push(`${outerColor} ${outerStop}%`)
+              if (outerStop < 100) stops.push(`${outerColor} 100%`)
+              return `radial-gradient(${shape || 'circle'} ${cssSize} at ${cssPosition}, ${stops.join(', ')})`
+            })() : 'transparent',
+            opacity: showLinearLayer ? 0 : 1,
+            transition: 'opacity 0.6s ease-in-out',
+          }}
+        />
+      </>
           {!hasCompletedFirstGeneration ? (
             /* Landing: gradient + centered input with radial/linear buttons */
             <div
