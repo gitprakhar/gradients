@@ -1,4 +1,12 @@
-figma.showUI(__html__, { width: 320, height: 240 });
+figma.showUI(__html__, { width: 320, height: 460 });
+
+function sendSelectionState() {
+  const selection = figma.currentPage.selection;
+  figma.ui.postMessage({
+    type: 'selection-change',
+    hasSelection: selection.length > 0,
+  });
+}
 
 function clamp01(v) {
   return Math.max(0, Math.min(1, v));
@@ -104,13 +112,9 @@ figma.ui.onmessage = (msg) => {
   let applied = 0;
 
   if (selection.length === 0) {
-    const rect = figma.createRectangle();
-    rect.resize(512, 512);
-    applyGradientToNode(rect, stops, gradientType, radialPosition);
-    figma.currentPage.appendChild(rect);
-    figma.currentPage.selection = [rect];
-    figma.viewport.scrollAndZoomIntoView([rect]);
-    applied = 1;
+    figma.notify('Select a layer to apply');
+    sendSelectionState();
+    return;
   } else {
     for (const node of selection) {
       if (applyGradientToNode(node, stops, gradientType, radialPosition)) applied += 1;
@@ -123,3 +127,9 @@ figma.ui.onmessage = (msg) => {
     figma.notify(`Applied gradient to ${applied} node${applied === 1 ? '' : 's'}`);
   }
 };
+
+figma.on('selectionchange', () => {
+  sendSelectionState();
+});
+
+sendSelectionState();

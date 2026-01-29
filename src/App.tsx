@@ -79,6 +79,40 @@ function rotateHue(hex: string, degrees: number): string {
   return rgbToHex(R, G, B)
 }
 
+function clampStop(position: number): number {
+  return Math.max(0, Math.min(100, Math.round(position)))
+}
+
+function linearStopsToRadial(stops: { position: number; color: string }[]): RadialGradientResult {
+  const sorted = [...stops].sort((a, b) => a.position - b.position)
+  const centerColor = sorted[0]?.color || '#000000'
+  const outerColor = sorted[sorted.length - 1]?.color || centerColor
+  const midColors = sorted.slice(1, -1).map((s) => ({
+    color: s.color,
+    position: clampStop(s.position),
+  }))
+  return {
+    centerColor,
+    outerColor,
+    midColors: midColors.length ? midColors : undefined,
+    shape: 'circle',
+    size: 'medium',
+    softness: 'soft',
+    position: 'center',
+  }
+}
+
+function radialToLinearStops(radial: RadialGradientResult): { position: number; color: string }[] {
+  const mid = radial.midColors
+    ? [...radial.midColors].map((m) => ({ position: clampStop(m.position), color: m.color }))
+    : []
+  return [
+    { position: 0, color: radial.centerColor },
+    ...mid,
+    { position: 100, color: radial.outerColor },
+  ].sort((a, b) => a.position - b.position)
+}
+
 const DOWNLOAD_SIZES = [
   { label: '16:9 (1920×1080)', width: 1920, height: 1080, name: '16-9' },
   { label: '16:9 (1600×900)', width: 1600, height: 900, name: '16-9-small' },
@@ -715,6 +749,30 @@ export function App() {
     }
   }
 
+  const switchToLinear = () => {
+    if (gradientType === 'linear') return
+    if (gradientType === 'radial' && radialGradient) {
+      const mapped = radialToLinearStops(radialGradient)
+      setColorStops(mapped)
+      setCachedLinearGradient(mapped)
+    } else if (cachedLinearGradient) {
+      setColorStops(cachedLinearGradient)
+    }
+    setGradientType('linear')
+  }
+
+  const switchToRadial = () => {
+    if (gradientType === 'radial') return
+    if (gradientType === 'linear') {
+      const mapped = linearStopsToRadial(colorStopsRef.current)
+      setRadialGradient(mapped)
+      setCachedRadialGradient(mapped)
+    } else if (cachedRadialGradient) {
+      setRadialGradient(cachedRadialGradient)
+    }
+    setGradientType('radial')
+  }
+
   const gradientString = () => {
     if (gradientType === 'radial' && radialGradient) {
       const { centerColor, outerColor, midColors, shape, position, size, softness } = radialGradient
@@ -916,18 +974,7 @@ export function App() {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation()
-                          if (hasCompletedFirstGeneration && gradientType !== 'linear') {
-                            // Check if we have a cached linear gradient
-                            if (cachedLinearGradient) {
-                              setColorStops(cachedLinearGradient)
-                              setGradientType('linear')
-                            } else {
-                              // Regenerate with linear if we've already generated and are switching types
-                              handleGenerateGradient('linear')
-                            }
-                          } else {
-                            setGradientType('linear')
-                          }
+                          switchToLinear()
                         }}
                         disabled={isGenerating}
                         className={`px-3 py-1.5 text-xs font-sans transition-colors ${
@@ -942,18 +989,7 @@ export function App() {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation()
-                          if (hasCompletedFirstGeneration && gradientType !== 'radial') {
-                            // Check if we have a cached radial gradient
-                            if (cachedRadialGradient) {
-                              setRadialGradient(cachedRadialGradient)
-                              setGradientType('radial')
-                            } else {
-                              // Regenerate with radial if we've already generated and are switching types
-                              handleGenerateGradient('radial')
-                            }
-                          } else {
-                            setGradientType('radial')
-                          }
+                          switchToRadial()
                         }}
                         disabled={isGenerating}
                         className={`px-3 py-1.5 text-xs font-sans transition-colors ${
@@ -1023,18 +1059,7 @@ export function App() {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation()
-                          if (hasCompletedFirstGeneration && gradientType !== 'linear') {
-                            // Check if we have a cached linear gradient
-                            if (cachedLinearGradient) {
-                              setColorStops(cachedLinearGradient)
-                              setGradientType('linear')
-                            } else {
-                              // Regenerate with linear if we've already generated and are switching types
-                              handleGenerateGradient('linear')
-                            }
-                          } else {
-                            setGradientType('linear')
-                          }
+                          switchToLinear()
                         }}
                         disabled={isGenerating}
                         className={`px-3 py-1.5 text-xs font-sans transition-colors ${
@@ -1049,18 +1074,7 @@ export function App() {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation()
-                          if (hasCompletedFirstGeneration && gradientType !== 'radial') {
-                            // Check if we have a cached radial gradient
-                            if (cachedRadialGradient) {
-                              setRadialGradient(cachedRadialGradient)
-                              setGradientType('radial')
-                            } else {
-                              // Regenerate with radial if we've already generated and are switching types
-                              handleGenerateGradient('radial')
-                            }
-                          } else {
-                            setGradientType('radial')
-                          }
+                          switchToRadial()
                         }}
                         disabled={isGenerating}
                         className={`px-3 py-1.5 text-xs font-sans transition-colors ${

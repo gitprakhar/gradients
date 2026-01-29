@@ -4,50 +4,34 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Vibe Gradients</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/thomas-lowry/figma-plugin-ds/dist/figma-plugin-ds.css"
+    />
     <style>
       :root { color-scheme: light; }
       body {
         margin: 0;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         background: #f6f6f7;
-        color: #111;
       }
       .wrap {
         display: flex;
         flex-direction: column;
-        gap: 10px;
+        gap: 12px;
         padding: 12px;
       }
       .preview {
-        height: 72px;
-        border-radius: 6px;
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        border-radius: 0;
         background: linear-gradient(180deg, #e6e6e6, #cfcfcf);
         border: 1px solid rgba(0,0,0,0.06);
-      }
-      input[type="text"] {
-        height: 36px;
-        padding: 0 10px;
-        border-radius: 8px;
-        border: 1px solid rgba(0,0,0,0.12);
-        background: white;
-        font-size: 14px;
-      }
-      button {
-        height: 36px;
-        border: 0;
-        border-radius: 8px;
-        background: #111;
-        color: white;
-        font-size: 14px;
-        cursor: pointer;
-      }
-      button:disabled {
-        opacity: 0.6;
-        cursor: default;
       }
       .row {
         display: flex;
         gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
       }
       .status {
         min-height: 18px;
@@ -58,26 +42,35 @@
         font-size: 11px;
         color: #999;
       }
+      .button {
+        border-radius: 0;
+      }
+      .button--primary {
+        background: #000;
+        border-color: #000;
+        color: #fff;
+      }
       code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
     </style>
   </head>
   <body>
     <div class="wrap">
       <div class="preview" id="preview"></div>
-      <input id="prompt" type="text" placeholder="Search a vibe…" />
-      <div class="row">
-        <label for="type" class="hint" style="align-self:center;">Type</label>
-        <select id="type" style="flex:1;height:32px;border-radius:8px;border:1px solid rgba(0,0,0,0.12);padding:0 8px;background:white;">
+      <div class="input">
+        <select id="gradient-type" class="input__field" aria-label="Gradient type">
           <option value="linear" selected>Linear</option>
           <option value="radial">Radial</option>
         </select>
       </div>
+      <div class="input">
+        <input id="prompt" class="input__field" type="text" placeholder="Search a vibe…" />
+      </div>
       <div class="row">
-        <button id="generate">Generate</button>
-        <button id="apply" disabled>Apply</button>
+        <button id="generate" class="button button--primary" type="button">Generate</button>
+        <button id="apply" class="button button--secondary" type="button" disabled>Apply</button>
+        <span id="selection-hint" class="hint" style="display:none;">Select a layer to apply</span>
       </div>
       <div class="status" id="status"></div>
-      <div class="hint">Set your API in <code>plugin/ui.html</code> and <code>plugin/manifest.json</code>.</div>
     </div>
 
     <script>
@@ -89,13 +82,37 @@
       const generateBtn = document.getElementById('generate');
       const applyBtn = document.getElementById('apply');
       const statusEl = document.getElementById('status');
-      const typeEl = document.getElementById('type');
+      const selectionHint = document.getElementById('selection-hint');
+      const typeSelect = document.getElementById('gradient-type');
 
-      let lastStops = null;
+      const DEFAULT_STOPS = [
+        { color: '#0B1A0C', stop: 0 },
+        { color: '#1B4B29', stop: 50 },
+        { color: '#356B3A', stop: 100 },
+      ];
+
+      let lastStops = DEFAULT_STOPS;
       let lastRadialPosition = 'center';
+      let currentType = 'linear';
+      let animationFrameId = null;
+      let loadingFrameId = null;
+      let isGenerating = false;
+      let hasSelection = false;
+      let hasGenerated = false;
 
       function setStatus(text) {
         statusEl.textContent = text || '';
+      }
+
+      function updateApplyVisibility() {
+        if (!hasSelection) {
+          applyBtn.style.display = 'none';
+          selectionHint.style.display = hasGenerated && !isGenerating ? '' : 'none';
+        } else {
+          applyBtn.style.display = '';
+          selectionHint.style.display = 'none';
+          if (!isGenerating) setStatus('');
+        }
       }
 
       function normalizeStops(raw) {
@@ -118,6 +135,106 @@
           return `radial-gradient(circle at center, ${parts.join(', ')})`;
         }
         return `linear-gradient(180deg, ${parts.join(', ')})`;
+      }
+
+      // --- Color interpolation for preview animation ---
+      function hexToRgb(hex) {
+        const n = parseInt(hex.slice(1), 16);
+        return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+      }
+      function rgbToHex(r, g, b) {
+        return '#' + [r, g, b].map((x) => Math.round(x).toString(16).padStart(2, '0')).join('');
+      }
+      function lerpHex(a, b, t) {
+        const ra = hexToRgb(a), rb = hexToRgb(b);
+        return rgbToHex(
+          ra.r + (rb.r - ra.r) * t,
+          ra.g + (rb.g - ra.g) * t,
+          ra.b + (rb.b - ra.b) * t
+        );
+      }
+      function easeInOutCubic(t) {
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      }
+      function sampleGradient(stops, p) {
+        const sorted = [...stops].sort((a, b) => a.stop - b.stop);
+        if (p <= 0) return sorted[0].color;
+        if (p >= 1) return sorted[sorted.length - 1].color;
+        const pos = p * 100;
+        for (let i = 0; i < sorted.length - 1; i++) {
+          if (pos >= sorted[i].stop && pos <= sorted[i + 1].stop) {
+            const d = sorted[i + 1].stop - sorted[i].stop;
+            const t = d === 0 ? 1 : (pos - sorted[i].stop) / d;
+            return lerpHex(sorted[i].color, sorted[i + 1].color, t);
+          }
+        }
+        return sorted[0].color;
+      }
+      function animatePreviewTransition(fromStops, toStops, type) {
+        if (!fromStops || fromStops.length < 2) {
+          preview.style.background = toCssGradient(toStops, type);
+          return;
+        }
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
+
+        const positions = Array.from(
+          new Set([...fromStops.map((s) => s.stop), ...toStops.map((s) => s.stop), 0, 100])
+        ).sort((a, b) => a - b);
+
+        const startColors = positions.map((p) => sampleGradient(fromStops, p / 100));
+        const endColors = positions.map((p) => sampleGradient(toStops, p / 100));
+        const duration = 900;
+        const state = { start: 0 };
+
+        const tick = (now) => {
+          if (!state.start) state.start = now;
+          const elapsed = now - state.start;
+          const t = Math.min(1, elapsed / duration);
+          const eased = easeInOutCubic(t);
+          const interpolated = positions.map((p, i) => ({
+            stop: p,
+            color: lerpHex(startColors[i], endColors[i], eased),
+          }));
+          preview.style.background = toCssGradient(interpolated, type);
+          if (t < 1) {
+            animationFrameId = requestAnimationFrame(tick);
+          } else {
+            animationFrameId = null;
+            preview.style.background = toCssGradient(toStops, type);
+          }
+        };
+        animationFrameId = requestAnimationFrame(tick);
+      }
+
+      function startLoadingAnimation() {
+        if (loadingFrameId) cancelAnimationFrame(loadingFrameId);
+        const baseStops = lastStops && lastStops.length >= 2
+          ? lastStops
+          : [{ color: '#f0f0f0', stop: 0 }, { color: '#e2e2e2', stop: 100 }];
+        const positions = Array.from(
+          new Set([...baseStops.map((s) => s.stop), 0, 100])
+        ).sort((a, b) => a - b);
+
+        const state = { start: 0 };
+        const tick = (now) => {
+          if (!state.start) state.start = now;
+          const elapsed = now - state.start;
+          const phase = (elapsed / 1000) * 45;
+          const stops = positions.map((p) => {
+            const hue = (p * 2 + phase) % 360;
+            return { stop: p, color: `hsl(${hue} 80% 65%)` };
+          });
+          preview.style.background = toCssGradient(stops, currentType);
+          loadingFrameId = requestAnimationFrame(tick);
+        };
+        loadingFrameId = requestAnimationFrame(tick);
+      }
+
+      function stopLoadingAnimation() {
+        if (loadingFrameId) {
+          cancelAnimationFrame(loadingFrameId);
+          loadingFrameId = null;
+        }
       }
 
       function linearSystemPrompt() {
@@ -375,35 +492,88 @@ Return ONLY valid JSON. No markdown, no explanation.`;
         return { stops: parseLinearResponse(content), position: 'center' };
       }
 
-      generateBtn.onclick = async () => {
+      function updateType() {
+        currentType = typeSelect && typeSelect.value === 'radial' ? 'radial' : 'linear';
+        if (lastStops && !isGenerating && !loadingFrameId) {
+          preview.style.background = toCssGradient(lastStops, currentType);
+        }
+      }
+
+      function setTypeDisabled(disabled) {
+        if (typeSelect) {
+          typeSelect.disabled = disabled;
+          typeSelect.style.opacity = disabled ? '0.5' : '1';
+        }
+      }
+
+      if (typeSelect) typeSelect.addEventListener('change', updateType);
+      updateType();
+
+      function applyGradientFromLast() {
+        if (!lastStops) return;
+        parent.postMessage(
+          { pluginMessage: { type: 'apply-gradient', stops: lastStops, gradientType: currentType, radialPosition: lastRadialPosition } },
+          '*'
+        );
+      }
+
+      async function handleGenerate() {
         const q = promptEl.value.trim();
         if (!q) return;
         promptEl.blur();
-        setStatus('Generating…');
+        setStatus('');
         generateBtn.disabled = true;
         applyBtn.disabled = true;
+        setTypeDisabled(true);
+        isGenerating = true;
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+          animationFrameId = null;
+        }
+        startLoadingAnimation();
         try {
-          const type = typeEl.value === 'radial' ? 'radial' : 'linear';
-          const result = await generateGradient(q, type);
+          const result = await generateGradient(q, currentType);
+          const previousStops = lastStops;
           lastStops = result.stops;
+          hasGenerated = true;
           // Keep Figma behavior aligned with preview; ignore model position for now.
           lastRadialPosition = 'center';
-          preview.style.background = toCssGradient(result.stops, type);
-          setStatus('Ready');
-          applyBtn.disabled = false;
+          stopLoadingAnimation();
+          animatePreviewTransition(previousStops, result.stops, currentType);
+          applyBtn.disabled = !hasSelection;
         } catch (err) {
+          stopLoadingAnimation();
           setStatus(String(err.message || err));
         } finally {
           generateBtn.disabled = false;
+          setTypeDisabled(false);
+          isGenerating = false;
+          updateApplyVisibility();
         }
-      };
+      }
+
+      generateBtn.onclick = handleGenerate;
+      promptEl.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') handleGenerate();
+      });
 
       applyBtn.onclick = () => {
         if (!lastStops) return;
         promptEl.blur();
-        const gradientType = typeEl.value === 'radial' ? 'radial' : 'linear';
-        parent.postMessage({ pluginMessage: { type: 'apply-gradient', stops: lastStops, gradientType, radialPosition: lastRadialPosition } }, '*');
+        applyGradientFromLast();
       };
+
+      window.onmessage = (event) => {
+        const msg = event.data && event.data.pluginMessage;
+        if (!msg || msg.type !== 'selection-change') return;
+        hasSelection = !!msg.hasSelection;
+        applyBtn.disabled = !hasSelection || !lastStops || isGenerating;
+        updateApplyVisibility();
+      };
+
+      promptEl.placeholder = 'Deep dark forest';
+      preview.style.background = toCssGradient(DEFAULT_STOPS, currentType);
+      updateApplyVisibility();
     </script>
   </body>
 </html>
