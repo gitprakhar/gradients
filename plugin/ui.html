@@ -45,6 +45,21 @@
       .button {
         border-radius: 0;
       }
+      .input__field {
+        height: 32px;
+        padding: 6px 8px;
+        font-size: 12px;
+        line-height: 1.2;
+      }
+      select.input__field {
+        padding-right: 24px;
+      }
+      .button {
+        height: 30px;
+        padding: 0 10px;
+        font-size: 12px;
+        line-height: 30px;
+      }
       .button--primary {
         background: #000;
         border-color: #000;
@@ -94,6 +109,10 @@
       let lastStops = DEFAULT_STOPS;
       let lastRadialPosition = 'center';
       let currentType = 'linear';
+      let lastPrompt = '';
+      let cachePrompt = '';
+      let cachedLinearStops = null;
+      let cachedRadial = null;
       let animationFrameId = null;
       let loadingFrameId = null;
       let isGenerating = false;
@@ -467,6 +486,9 @@ Return ONLY valid JSON. No markdown, no explanation.`;
 
       async function generateGradient(prompt, type) {
         const systemPrompt = type === 'radial' ? radialSystemPrompt() : linearSystemPrompt();
+        const userPrompt = type === 'radial'
+          ? `Generate a radial gradient for: ${prompt}`
+          : `Generate a gradient for: ${prompt}`;
 
         const res = await fetch(API_URL, {
           method: 'POST',
@@ -475,7 +497,7 @@ Return ONLY valid JSON. No markdown, no explanation.`;
             model: MODEL,
             messages: [
               { role: 'system', content: systemPrompt },
-              { role: 'user', content: `Generate a gradient for: ${prompt}` },
+              { role: 'user', content: userPrompt },
             ],
             stream: false,
           }),
@@ -492,10 +514,25 @@ Return ONLY valid JSON. No markdown, no explanation.`;
         return { stops: parseLinearResponse(content), position: 'center' };
       }
 
-      function updateType() {
+      function updateType(shouldGenerate) {
         currentType = typeSelect && typeSelect.value === 'radial' ? 'radial' : 'linear';
         if (lastStops && !isGenerating && !loadingFrameId) {
           preview.style.background = toCssGradient(lastStops, currentType);
+        }
+        if (shouldGenerate && !isGenerating) {
+          const prompt = getEffectivePrompt();
+          const hasUserPrompt = !!(promptEl.value.trim() || lastPrompt);
+          const hasCached = cachePrompt === prompt && (
+            (currentType === 'linear' && Array.isArray(cachedLinearStops)) ||
+            (currentType === 'radial' && cachedRadial && Array.isArray(cachedRadial.stops))
+          );
+          if (prompt && hasUserPrompt && hasCached) {
+            applyCachedForType(prompt);
+            return;
+          }
+          if (prompt && hasUserPrompt) {
+            handleGenerate(prompt);
+          }
         }
       }
 
@@ -506,8 +543,8 @@ Return ONLY valid JSON. No markdown, no explanation.`;
         }
       }
 
-      if (typeSelect) typeSelect.addEventListener('change', updateType);
-      updateType();
+      if (typeSelect) typeSelect.addEventListener('change', () => updateType(true));
+      updateType(false);
 
       function applyGradientFromLast() {
         if (!lastStops) return;
@@ -517,9 +554,40 @@ Return ONLY valid JSON. No markdown, no explanation.`;
         );
       }
 
-      async function handleGenerate() {
+      function getEffectivePrompt() {
         const q = promptEl.value.trim();
+        if (q) return q;
+        if (lastPrompt) return lastPrompt;
+        return (promptEl.placeholder || '').trim();
+      }
+
+      function applyCachedForType(prompt) {
+        if (cachePrompt !== prompt) return;
+        const previousStops = lastStops;
+        if (currentType === 'radial' && cachedRadial && Array.isArray(cachedRadial.stops)) {
+          lastStops = cachedRadial.stops;
+          lastRadialPosition = cachedRadial.position || 'center';
+        } else if (currentType === 'linear' && Array.isArray(cachedLinearStops)) {
+          lastStops = cachedLinearStops;
+        } else {
+          return;
+        }
+        hasGenerated = true;
+        animatePreviewTransition(previousStops, lastStops, currentType);
+        applyBtn.disabled = !hasSelection;
+        updateApplyVisibility();
+      }
+
+      async function handleGenerate(forcedPrompt) {
+        const explicitPrompt = typeof forcedPrompt === 'string' ? forcedPrompt : '';
+        const q = String(explicitPrompt || getEffectivePrompt() || '').trim();
         if (!q) return;
+        if (cachePrompt && cachePrompt !== q) {
+          cachedLinearStops = null;
+          cachedRadial = null;
+        }
+        cachePrompt = q;
+        lastPrompt = q;
         promptEl.blur();
         setStatus('');
         generateBtn.disabled = true;
@@ -538,6 +606,11 @@ Return ONLY valid JSON. No markdown, no explanation.`;
           hasGenerated = true;
           // Keep Figma behavior aligned with preview; ignore model position for now.
           lastRadialPosition = 'center';
+          if (currentType === 'radial') {
+            cachedRadial = { stops: result.stops, position: result.position || 'center' };
+          } else {
+            cachedLinearStops = result.stops;
+          }
           stopLoadingAnimation();
           animatePreviewTransition(previousStops, result.stops, currentType);
           applyBtn.disabled = !hasSelection;
