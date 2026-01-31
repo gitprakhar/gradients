@@ -1,4 +1,6 @@
-figma.showUI(__html__, { width: 320, height: 460 });
+figma.showUI(__html__, { width: 320, height: 520 });
+
+const STORAGE_KEY = 'savedGradients';
 
 function sendSelectionState() {
   const selection = figma.currentPage.selection;
@@ -98,7 +100,34 @@ function applyGradientToNode(node, stops, gradientType, radialPosition) {
 }
 
 figma.ui.onmessage = (msg) => {
-  if (!msg || msg.type !== 'apply-gradient') return;
+  if (!msg || !msg.type) return;
+
+  if (msg.type === 'load-gradients') {
+    figma.clientStorage.getAsync(STORAGE_KEY).then((items) => {
+      figma.ui.postMessage({
+        type: 'saved-gradients',
+        gradients: Array.isArray(items) ? items : [],
+      });
+    });
+    return;
+  }
+
+  if (msg.type === 'save-gradient') {
+    const incoming = msg.gradient || {};
+    figma.clientStorage.getAsync(STORAGE_KEY).then((items) => {
+      const list = Array.isArray(items) ? items : [];
+      const next = [incoming, ...list].slice(0, 50);
+      figma.clientStorage.setAsync(STORAGE_KEY, next).then(() => {
+        figma.ui.postMessage({
+          type: 'saved-gradients',
+          gradients: next,
+        });
+      });
+    });
+    return;
+  }
+
+  if (msg.type !== 'apply-gradient') return;
 
   const stops = Array.isArray(msg.stops) ? msg.stops : [];
   const gradientType = msg.gradientType === 'radial' ? 'radial' : 'linear';

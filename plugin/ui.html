@@ -13,17 +13,54 @@
       body {
         margin: 0;
         background: #f6f6f7;
+        overflow: hidden;
       }
       .wrap {
         display: flex;
         flex-direction: column;
+        gap: 0;
+        padding: 0 12px 12px;
+        height: 100vh;
+        overflow: hidden;
+      }
+      .tabs {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        display: flex;
+        gap: 16px;
+        background: #fff;
+        padding: 8px 12px;
+        margin: 0 -12px 12px -12px;
+        border-bottom: 1px solid rgba(0,0,0,0.08);
+      }
+      .tab {
+        padding: 6px 0;
+        font-size: 12px;
+        border: none;
+        border-radius: 0;
+        background: transparent;
+        color: #666;
+        cursor: pointer;
+      }
+      .tab.active {
+        color: #111;
+        font-weight: 600;
+        border-bottom: 2px solid #111;
+      }
+      .panel {
+        display: none;
+        flex-direction: column;
         gap: 12px;
-        padding: 12px;
+        padding-top: 0;
+      }
+      .panel.active {
+        display: flex;
       }
       .preview {
         width: 100%;
         aspect-ratio: 1 / 1;
-        border-radius: 0;
+        border-radius: 6px;
         background: linear-gradient(180deg, #e6e6e6, #cfcfcf);
         border: 1px solid rgba(0,0,0,0.06);
       }
@@ -43,7 +80,34 @@
         color: #999;
       }
       .button {
-        border-radius: 0;
+        border-radius: 4px;
+      }
+      .input__field {
+        border-radius: 4px;
+        padding: 6px 8px;
+        border: 1px solid rgba(0,0,0,0.12);
+        box-shadow: none;
+      }
+      .select-wrap {
+        position: relative;
+        width: 100%;
+      }
+      .select-wrap::after {
+        content: '';
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        width: 10px;
+        height: 6px;
+        transform: translateY(-50%);
+        background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1.25L5 4.75L9 1.25' fill='none' stroke='%23979797' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>") no-repeat center / 10px 6px;
+        pointer-events: none;
+      }
+      .select-wrap select.input__field {
+        padding-right: 24px;
+        appearance: none;
+        -webkit-appearance: none;
+        background: none;
       }
       .input__field {
         height: 32px;
@@ -65,27 +129,111 @@
         border-color: #000;
         color: #fff;
       }
+      .button--primary:not(:disabled):hover {
+        background: #111;
+        border-color: #111;
+      }
+      #generate:not(:disabled):hover {
+        background: #111;
+        border-color: #111;
+      }
+      .button--secondary:not(:disabled):hover {
+        background: rgba(0,0,0,0.04);
+        border-color: rgba(0,0,0,0.12);
+      }
+      .button:focus {
+        outline: none;
+        box-shadow: none;
+      }
+      .button:focus-visible {
+        outline: none;
+        box-shadow: none;
+      }
+      .button:active {
+        outline: none;
+        box-shadow: none;
+      }
+      .button:disabled {
+        border-color: transparent;
+        box-shadow: none;
+      }
+      .library {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .library-empty {
+        font-size: 12px;
+        color: #777;
+        padding: 6px 0;
+      }
+      .library-item {
+        display: grid;
+        grid-template-columns: 44px 1fr auto;
+        gap: 8px;
+        align-items: center;
+        padding: 6px;
+        border: 1px solid rgba(0,0,0,0.08);
+        border-radius: 6px;
+        background: #fff;
+      }
+      .library-preview {
+        width: 44px;
+        height: 44px;
+        border-radius: 6px;
+        border: 1px solid rgba(0,0,0,0.08);
+        background: #eee;
+      }
+      .library-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+      }
+      .library-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: #111;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .library-subtitle {
+        font-size: 11px;
+        color: #666;
+      }
       code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
     </style>
   </head>
   <body>
     <div class="wrap">
-      <div class="preview" id="preview"></div>
-      <div class="input">
-        <select id="gradient-type" class="input__field" aria-label="Gradient type">
-          <option value="linear" selected>Linear</option>
-          <option value="radial">Radial</option>
-        </select>
+      <div class="tabs">
+        <button class="tab active" id="tab-generate" type="button">Generate</button>
+        <button class="tab" id="tab-library" type="button">Library</button>
       </div>
-      <div class="input">
-        <input id="prompt" class="input__field" type="text" placeholder="Search a vibe…" />
+
+      <div class="panel active" id="panel-generate">
+        <div class="preview" id="preview"></div>
+        <div class="input select-wrap">
+          <select id="gradient-type" class="input__field" aria-label="Gradient type">
+            <option value="linear" selected>Linear</option>
+            <option value="radial">Radial</option>
+          </select>
+        </div>
+        <div class="input">
+          <input id="prompt" class="input__field" type="text" placeholder="Search a vibe…" />
+        </div>
+        <div class="row">
+          <button id="generate" class="button button--primary" type="button">Generate</button>
+          <button id="apply" class="button button--secondary" type="button" disabled>Apply</button>
+          <span id="selection-hint" class="hint" style="display:none;">Select a layer to apply</span>
+        </div>
+        <div class="status" id="status"></div>
       </div>
-      <div class="row">
-        <button id="generate" class="button button--primary" type="button">Generate</button>
-        <button id="apply" class="button button--secondary" type="button" disabled>Apply</button>
-        <span id="selection-hint" class="hint" style="display:none;">Select a layer to apply</span>
+
+      <div class="panel" id="panel-library">
+        <div class="library" id="library-list"></div>
       </div>
-      <div class="status" id="status"></div>
     </div>
 
     <script>
@@ -99,6 +247,11 @@
       const statusEl = document.getElementById('status');
       const selectionHint = document.getElementById('selection-hint');
       const typeSelect = document.getElementById('gradient-type');
+      const tabGenerate = document.getElementById('tab-generate');
+      const tabLibrary = document.getElementById('tab-library');
+      const panelGenerate = document.getElementById('panel-generate');
+      const panelLibrary = document.getElementById('panel-library');
+      const libraryList = document.getElementById('library-list');
 
       const DEFAULT_STOPS = [
         { color: '#0B1A0C', stop: 0 },
@@ -113,6 +266,7 @@
       let cachePrompt = '';
       let cachedLinearStops = null;
       let cachedRadial = null;
+      let savedGradients = [];
       let animationFrameId = null;
       let loadingFrameId = null;
       let isGenerating = false;
@@ -154,6 +308,85 @@
           return `radial-gradient(circle at center, ${parts.join(', ')})`;
         }
         return `linear-gradient(180deg, ${parts.join(', ')})`;
+      }
+
+      function setActiveTab(name) {
+        const isGenerate = name === 'generate';
+        tabGenerate.classList.toggle('active', isGenerate);
+        tabLibrary.classList.toggle('active', !isGenerate);
+        panelGenerate.classList.toggle('active', isGenerate);
+        panelLibrary.classList.toggle('active', !isGenerate);
+      }
+
+      function formatDate(ts) {
+        if (!ts) return '';
+        try {
+          return new Date(ts).toLocaleDateString();
+        } catch {
+          return '';
+        }
+      }
+
+      function renderLibrary() {
+        libraryList.innerHTML = '';
+        if (!savedGradients.length) {
+          const empty = document.createElement('div');
+          empty.className = 'library-empty';
+          empty.textContent = 'No gradients saved yet.';
+          libraryList.appendChild(empty);
+          return;
+        }
+        savedGradients.forEach((item) => {
+          const row = document.createElement('div');
+          row.className = 'library-item';
+
+          const previewEl = document.createElement('div');
+          previewEl.className = 'library-preview';
+          previewEl.style.background = toCssGradient(item.stops || [], item.type || 'linear');
+
+          const meta = document.createElement('div');
+          meta.className = 'library-meta';
+          const title = document.createElement('div');
+          title.className = 'library-title';
+          title.textContent = item.prompt || 'Untitled';
+          const subtitle = document.createElement('div');
+          subtitle.className = 'library-subtitle';
+          subtitle.textContent = `${item.type || 'linear'} · ${formatDate(item.createdAt)}`;
+          meta.appendChild(title);
+          meta.appendChild(subtitle);
+
+          const useBtn = document.createElement('button');
+          useBtn.className = 'button button--secondary';
+          useBtn.type = 'button';
+          useBtn.textContent = 'Use';
+          useBtn.addEventListener('click', () => {
+            applySavedGradient(item);
+          });
+
+          row.appendChild(previewEl);
+          row.appendChild(meta);
+          row.appendChild(useBtn);
+          libraryList.appendChild(row);
+        });
+      }
+
+      function applySavedGradient(item) {
+        if (!item || !Array.isArray(item.stops) || item.stops.length < 2) return;
+        const previousStops = lastStops;
+        currentType = item.type === 'radial' ? 'radial' : 'linear';
+        typeSelect.value = currentType;
+        lastStops = item.stops;
+        lastRadialPosition = item.radialPosition || 'center';
+        lastPrompt = item.prompt || '';
+        promptEl.value = lastPrompt;
+        cachePrompt = lastPrompt;
+        cachedLinearStops = currentType === 'linear' ? item.stops : null;
+        cachedRadial = currentType === 'radial' ? { stops: item.stops, position: lastRadialPosition } : null;
+        hasGenerated = true;
+        animatePreviewTransition(previousStops, lastStops, currentType);
+        applyBtn.disabled = !hasSelection;
+        updateApplyVisibility();
+        setActiveTab('generate');
       }
 
       // --- Color interpolation for preview animation ---
@@ -516,23 +749,20 @@ Return ONLY valid JSON. No markdown, no explanation.`;
 
       function updateType(shouldGenerate) {
         currentType = typeSelect && typeSelect.value === 'radial' ? 'radial' : 'linear';
+        const prompt = getEffectivePrompt();
+        const hasUserPrompt = !!(promptEl.value.trim() || lastPrompt);
+        const hasCached = cachePrompt === prompt && (
+          (currentType === 'linear' && Array.isArray(cachedLinearStops)) ||
+          (currentType === 'radial' && cachedRadial && Array.isArray(cachedRadial.stops))
+        );
+
+        if (shouldGenerate && !isGenerating && hasUserPrompt && prompt && hasCached) {
+          applyCachedForType(prompt);
+          return;
+        }
+
         if (lastStops && !isGenerating && !loadingFrameId) {
           preview.style.background = toCssGradient(lastStops, currentType);
-        }
-        if (shouldGenerate && !isGenerating) {
-          const prompt = getEffectivePrompt();
-          const hasUserPrompt = !!(promptEl.value.trim() || lastPrompt);
-          const hasCached = cachePrompt === prompt && (
-            (currentType === 'linear' && Array.isArray(cachedLinearStops)) ||
-            (currentType === 'radial' && cachedRadial && Array.isArray(cachedRadial.stops))
-          );
-          if (prompt && hasUserPrompt && hasCached) {
-            applyCachedForType(prompt);
-            return;
-          }
-          if (prompt && hasUserPrompt) {
-            handleGenerate(prompt);
-          }
         }
       }
 
@@ -594,6 +824,7 @@ Return ONLY valid JSON. No markdown, no explanation.`;
         applyBtn.disabled = true;
         setTypeDisabled(true);
         isGenerating = true;
+        updateApplyVisibility();
         if (animationFrameId) {
           cancelAnimationFrame(animationFrameId);
           animationFrameId = null;
@@ -611,6 +842,22 @@ Return ONLY valid JSON. No markdown, no explanation.`;
           } else {
             cachedLinearStops = result.stops;
           }
+          parent.postMessage(
+            {
+              pluginMessage: {
+                type: 'save-gradient',
+                gradient: {
+                  id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                  createdAt: Date.now(),
+                  prompt: q,
+                  type: currentType,
+                  stops: result.stops,
+                  radialPosition: lastRadialPosition,
+                },
+              },
+            },
+            '*'
+          );
           stopLoadingAnimation();
           animatePreviewTransition(previousStops, result.stops, currentType);
           applyBtn.disabled = !hasSelection;
@@ -626,9 +873,7 @@ Return ONLY valid JSON. No markdown, no explanation.`;
       }
 
       generateBtn.onclick = handleGenerate;
-      promptEl.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter') handleGenerate();
-      });
+      // Only generate on explicit button click.
 
       applyBtn.onclick = () => {
         if (!lastStops) return;
@@ -638,15 +883,26 @@ Return ONLY valid JSON. No markdown, no explanation.`;
 
       window.onmessage = (event) => {
         const msg = event.data && event.data.pluginMessage;
-        if (!msg || msg.type !== 'selection-change') return;
-        hasSelection = !!msg.hasSelection;
-        applyBtn.disabled = !hasSelection || !lastStops || isGenerating;
-        updateApplyVisibility();
+        if (!msg || !msg.type) return;
+        if (msg.type === 'selection-change') {
+          hasSelection = !!msg.hasSelection;
+          applyBtn.disabled = !hasSelection || !lastStops || isGenerating;
+          updateApplyVisibility();
+          return;
+        }
+        if (msg.type === 'saved-gradients') {
+          savedGradients = Array.isArray(msg.gradients) ? msg.gradients : [];
+          renderLibrary();
+        }
       };
+
+      tabGenerate.addEventListener('click', () => setActiveTab('generate'));
+      tabLibrary.addEventListener('click', () => setActiveTab('library'));
 
       promptEl.placeholder = 'Deep dark forest';
       preview.style.background = toCssGradient(DEFAULT_STOPS, currentType);
       updateApplyVisibility();
+      parent.postMessage({ pluginMessage: { type: 'load-gradients' } }, '*');
     </script>
   </body>
 </html>
