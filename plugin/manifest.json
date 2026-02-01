@@ -1,10 +1,11 @@
 {
   "name": "Any Colors You Like",
-  "id": "vibe-gradients-dev",
+  "id": "1599499735834330998",
   "api": "1.0.0",
   "editorType": ["figma"],
   "main": "main.js",
   "ui": "ui.html",
+  "documentAccess": "dynamic-page",
   "networkAccess": {
     "allowedDomains": [
       "https://ollama.com",

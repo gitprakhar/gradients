@@ -1,4 +1,8 @@
-figma.showUI(__html__, { width: 320, height: 520 });
+const UI_WIDTH = 320;
+const UI_HEIGHT_COMPACT = 440;
+const UI_HEIGHT_FULL = 520;
+
+figma.showUI(__html__, { width: UI_WIDTH, height: UI_HEIGHT_FULL });
 
 const STORAGE_KEY = 'savedGradients';
 
@@ -102,6 +106,12 @@ function applyGradientToNode(node, stops, gradientType, radialPosition) {
 figma.ui.onmessage = (msg) => {
   if (!msg || !msg.type) return;
 
+  if (msg.type === 'resize-ui') {
+    const mode = msg.mode === 'compact' ? 'compact' : 'full';
+    figma.ui.resize(UI_WIDTH, mode === 'compact' ? UI_HEIGHT_COMPACT : UI_HEIGHT_FULL);
+    return;
+  }
+
   if (msg.type === 'load-gradients') {
     figma.clientStorage.getAsync(STORAGE_KEY).then((items) => {
       figma.ui.postMessage({
@@ -117,6 +127,23 @@ figma.ui.onmessage = (msg) => {
     figma.clientStorage.getAsync(STORAGE_KEY).then((items) => {
       const list = Array.isArray(items) ? items : [];
       const next = [incoming, ...list].slice(0, 50);
+      figma.clientStorage.setAsync(STORAGE_KEY, next).then(() => {
+        figma.ui.postMessage({
+          type: 'saved-gradients',
+          gradients: next,
+        });
+      });
+    });
+    return;
+  }
+
+  if (msg.type === 'delete-gradient') {
+    const targetId = msg.id;
+    figma.clientStorage.getAsync(STORAGE_KEY).then((items) => {
+      const list = Array.isArray(items) ? items : [];
+      const next = typeof targetId === 'string'
+        ? list.filter((item) => item && item.id !== targetId)
+        : list;
       figma.clientStorage.setAsync(STORAGE_KEY, next).then(() => {
         figma.ui.postMessage({
           type: 'saved-gradients',

@@ -53,22 +53,53 @@
         flex-direction: column;
         gap: 12px;
         padding-top: 0;
+        flex: 1;
+        min-height: 0;
       }
       .panel.active {
         display: flex;
       }
-      .preview {
+      .preview-frame {
         width: 100%;
         aspect-ratio: 1 / 1;
         border-radius: 6px;
+        border: none;
+        overflow: hidden;
+        box-sizing: border-box;
+        background: #fff;
+        position: relative;
+      }
+      .preview {
+        position: absolute;
+        inset: -1px;
         background: linear-gradient(180deg, #e6e6e6, #cfcfcf);
-        border: 1px solid rgba(0,0,0,0.06);
+        display: block;
       }
       .row {
         display: flex;
         gap: 8px;
         align-items: center;
         flex-wrap: wrap;
+      }
+      .row .hint {
+        margin-left: 0;
+      }
+      .link-button {
+        background: none;
+        border: none;
+        padding: 0;
+        font-size: 12px;
+        color: #555;
+        cursor: pointer;
+        text-decoration: underline;
+      }
+      .link-button.align-right {
+        margin-left: auto;
+      }
+      .link-button:disabled {
+        color: #aaa;
+        cursor: default;
+        text-decoration: none;
       }
       .status {
         min-height: 18px;
@@ -88,6 +119,35 @@
         border: 1px solid rgba(0,0,0,0.12);
         box-shadow: none;
       }
+      .input-with-action {
+        position: relative;
+        width: 100%;
+      }
+      .input-with-action .input__field {
+        padding-right: 28px;
+      }
+      .input-action {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 20px;
+        height: 20px;
+        border: none;
+        background: transparent;
+        padding: 0;
+        cursor: pointer;
+        color: #111;
+      }
+      .input-action:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      .input-action svg {
+        display: block;
+        width: 14px;
+        height: 14px;
+      }
       .select-wrap {
         position: relative;
         width: 100%;
@@ -97,10 +157,10 @@
         position: absolute;
         right: 8px;
         top: 50%;
-        width: 10px;
-        height: 6px;
+        width: 20px;
+        height: 20px;
         transform: translateY(-50%);
-        background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1.25L5 4.75L9 1.25' fill='none' stroke='%23979797' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>") no-repeat center / 10px 6px;
+        background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14'><path d='M3 5.5L7 9.5L11 5.5' fill='none' stroke='%23111' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>") no-repeat center / 14px 14px;
         pointer-events: none;
       }
       .select-wrap select.input__field {
@@ -108,6 +168,9 @@
         appearance: none;
         -webkit-appearance: none;
         background: none;
+      }
+      .input__field:hover {
+        background: inherit;
       }
       .input__field {
         height: 32px;
@@ -161,6 +224,10 @@
         display: flex;
         flex-direction: column;
         gap: 8px;
+        overflow-y: auto;
+        padding-right: 16px;
+        margin-right: -8px;
+        box-sizing: border-box;
       }
       .library-empty {
         font-size: 12px;
@@ -187,8 +254,9 @@
       .library-meta {
         display: flex;
         flex-direction: column;
-        gap: 2px;
+        gap: 4px;
         min-width: 0;
+        align-items: flex-start;
       }
       .library-title {
         font-size: 12px;
@@ -197,10 +265,61 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        max-width: 160px;
       }
-      .library-subtitle {
-        font-size: 11px;
-        color: #666;
+      .library-delete {
+        background: none;
+        border: none;
+        padding: 0;
+        font-size: 12px;
+        color: #555;
+        cursor: pointer;
+        text-decoration: underline;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root { color-scheme: dark; }
+        body { background: #1b1b1b; }
+        .tabs { background: #1b1b1b; border-bottom-color: rgba(255,255,255,0.1); }
+        .tab { color: #aaa; }
+        .tab.active { color: #fff; border-bottom-color: #fff; }
+        .status { color: #aaa; }
+        .hint { color: #888; }
+        .preview { border-color: rgba(255,255,255,0.12); }
+        .input__field {
+          background: #2a2a2a;
+          color: #f2f2f2;
+          border-color: rgba(255,255,255,0.16);
+        }
+        .input-action {
+          color: #f2f2f2;
+        }
+        .select-wrap select.input__field {
+          background: #2a2a2a;
+        }
+        .input__field:hover,
+        .input__field:focus {
+          background: #2a2a2a;
+          border-color: rgba(255,255,255,0.2);
+          color: #f2f2f2;
+        }
+        .input__field::placeholder { color: #8a8a8a; }
+        .select-wrap::after {
+          background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14'><path d='M3 5.5L7 9.5L11 5.5' fill='none' stroke='%23B0B0B0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>") no-repeat center / 14px 14px;
+        }
+        .button--primary { background: #2a2a2a; border-color: rgba(255,255,255,0.16); color: #fff; }
+        .button--primary:not(:disabled):hover { background: #343434; border-color: rgba(255,255,255,0.2); }
+        #generate:not(:disabled):hover { background: #343434; border-color: rgba(255,255,255,0.2); }
+        .button--secondary:not(:disabled):hover {
+          background: rgba(255,255,255,0.08);
+          border-color: rgba(255,255,255,0.2);
+        }
+        .button--secondary { background: #2a2a2a; border-color: rgba(255,255,255,0.16); color: #fff; }
+        .link-button { color: #cfcfcf; }
+        .link-button:disabled { color: #777; }
+        .library-item { background: #232323; border-color: rgba(255,255,255,0.12); }
+        .library-preview { border-color: rgba(255,255,255,0.12); }
+        .library-title { color: #f2f2f2; }
+        .library-delete { color: #cfcfcf; }
       }
       code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
     </style>
@@ -213,20 +332,27 @@
       </div>
 
       <div class="panel active" id="panel-generate">
-        <div class="preview" id="preview"></div>
+        <div class="preview-frame">
+          <div class="preview" id="preview"></div>
+        </div>
         <div class="input select-wrap">
           <select id="gradient-type" class="input__field" aria-label="Gradient type">
             <option value="linear" selected>Linear</option>
             <option value="radial">Radial</option>
           </select>
         </div>
-        <div class="input">
+        <div class="input input-with-action">
           <input id="prompt" class="input__field" type="text" placeholder="Search a vibe…" />
+          <button id="generate-inline" class="input-action" type="button" aria-label="Generate">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+          </button>
         </div>
-        <div class="row">
-          <button id="generate" class="button button--primary" type="button">Generate</button>
-          <button id="apply" class="button button--secondary" type="button" disabled>Apply</button>
+        <div class="row" id="action-row">
+          <button id="apply" class="button button--primary" type="button" disabled>Apply</button>
           <span id="selection-hint" class="hint" style="display:none;">Select a layer to apply</span>
+          <button id="save-library" class="link-button align-right" type="button" disabled>Save to library</button>
         </div>
         <div class="status" id="status"></div>
       </div>
@@ -242,8 +368,10 @@
 
       const preview = document.getElementById('preview');
       const promptEl = document.getElementById('prompt');
-      const generateBtn = document.getElementById('generate');
+      const generateBtn = document.getElementById('generate-inline');
       const applyBtn = document.getElementById('apply');
+      const actionRow = document.getElementById('action-row');
+      const saveLibraryBtn = document.getElementById('save-library');
       const statusEl = document.getElementById('status');
       const selectionHint = document.getElementById('selection-hint');
       const typeSelect = document.getElementById('gradient-type');
@@ -253,13 +381,7 @@
       const panelLibrary = document.getElementById('panel-library');
       const libraryList = document.getElementById('library-list');
 
-      const DEFAULT_STOPS = [
-        { color: '#0B1A0C', stop: 0 },
-        { color: '#1B4B29', stop: 50 },
-        { color: '#356B3A', stop: 100 },
-      ];
-
-      let lastStops = DEFAULT_STOPS;
+      let lastStops = null;
       let lastRadialPosition = 'center';
       let currentType = 'linear';
       let lastPrompt = '';
@@ -272,12 +394,15 @@
       let isGenerating = false;
       let hasSelection = false;
       let hasGenerated = false;
+      let hasSavedCurrent = false;
+      let currentSavedId = '';
 
       function setStatus(text) {
         statusEl.textContent = text || '';
       }
 
       function updateApplyVisibility() {
+        actionRow.style.display = hasGenerated ? '' : 'none';
         if (!hasSelection) {
           applyBtn.style.display = 'none';
           selectionHint.style.display = hasGenerated && !isGenerating ? '' : 'none';
@@ -286,6 +411,13 @@
           selectionHint.style.display = 'none';
           if (!isGenerating) setStatus('');
         }
+        saveLibraryBtn.style.display = hasGenerated ? '' : 'none';
+        saveLibraryBtn.disabled = !hasGenerated || isGenerating || !lastStops;
+        saveLibraryBtn.textContent = hasSavedCurrent ? 'Saved' : 'Save to library';
+        parent.postMessage(
+          { pluginMessage: { type: 'resize-ui', mode: hasGenerated ? 'full' : 'compact' } },
+          '*'
+        );
       }
 
       function normalizeStops(raw) {
@@ -349,11 +481,19 @@
           const title = document.createElement('div');
           title.className = 'library-title';
           title.textContent = item.prompt || 'Untitled';
-          const subtitle = document.createElement('div');
-          subtitle.className = 'library-subtitle';
-          subtitle.textContent = `${item.type || 'linear'} · ${formatDate(item.createdAt)}`;
           meta.appendChild(title);
-          meta.appendChild(subtitle);
+
+          const deleteBtn = document.createElement('button');
+          deleteBtn.className = 'library-delete';
+          deleteBtn.type = 'button';
+          deleteBtn.textContent = 'Delete';
+          deleteBtn.addEventListener('click', () => {
+            parent.postMessage(
+              { pluginMessage: { type: 'delete-gradient', id: item.id } },
+              '*'
+            );
+          });
+          meta.appendChild(deleteBtn);
 
           const useBtn = document.createElement('button');
           useBtn.className = 'button button--secondary';
@@ -373,6 +513,7 @@
       function applySavedGradient(item) {
         if (!item || !Array.isArray(item.stops) || item.stops.length < 2) return;
         const previousStops = lastStops;
+        stopLoadingAnimation();
         currentType = item.type === 'radial' ? 'radial' : 'linear';
         typeSelect.value = currentType;
         lastStops = item.stops;
@@ -383,6 +524,8 @@
         cachedLinearStops = currentType === 'linear' ? item.stops : null;
         cachedRadial = currentType === 'radial' ? { stops: item.stops, position: lastRadialPosition } : null;
         hasGenerated = true;
+        hasSavedCurrent = true;
+        currentSavedId = item.id || '';
         animatePreviewTransition(previousStops, lastStops, currentType);
         applyBtn.disabled = !hasSelection;
         updateApplyVisibility();
@@ -460,23 +603,30 @@
 
       function startLoadingAnimation() {
         if (loadingFrameId) cancelAnimationFrame(loadingFrameId);
-        const baseStops = lastStops && lastStops.length >= 2
-          ? lastStops
-          : [{ color: '#f0f0f0', stop: 0 }, { color: '#e2e2e2', stop: 100 }];
-        const positions = Array.from(
-          new Set([...baseStops.map((s) => s.stop), 0, 100])
-        ).sort((a, b) => a - b);
+        const positions = [0, 50, 100];
 
         const state = { start: 0 };
         const tick = (now) => {
           if (!state.start) state.start = now;
           const elapsed = now - state.start;
-          const phase = (elapsed / 1000) * 45;
-          const stops = positions.map((p) => {
-            const hue = (p * 2 + phase) % 360;
-            return { stop: p, color: `hsl(${hue} 80% 65%)` };
-          });
-          preview.style.background = toCssGradient(stops, currentType);
+          const phase = (elapsed / 1000) * 12;
+          if (currentType === 'radial') {
+            const hue = (phase + 40) % 360;
+            const stops = [
+              { stop: 0, color: `hsl(${hue} 70% 60%)` },
+              { stop: 70, color: `hsl(${(hue + 30) % 360} 70% 50%)` },
+              { stop: 100, color: `hsl(${(hue + 60) % 360} 70% 40%)` },
+            ];
+            preview.style.background = `radial-gradient(circle at center, ${stops
+              .map((s) => `${s.color} ${s.stop}%`)
+              .join(', ')})`;
+          } else {
+            const stops = positions.map((p) => {
+              const hue = (p * 1.4 + phase) % 360;
+              return { stop: p, color: `hsl(${hue} 70% 55%)` };
+            });
+            preview.style.background = toCssGradient(stops, currentType);
+          }
           loadingFrameId = requestAnimationFrame(tick);
         };
         loadingFrameId = requestAnimationFrame(tick);
@@ -490,146 +640,35 @@
       }
 
       function linearSystemPrompt() {
-        return `You generate beautiful linear gradients that capture the essence, mood, and color palette of ANY concept.
+        return `Generate a linear gradient (top to bottom) that captures the vibe of the user's input.
 
-A linear gradient flows from top to bottom, like light falling, atmosphere shifting, or energy moving. Your job is to translate ANY input into a visually stunning gradient.
-
-Output format:
-[{"color": "#RRGGBB", "stop": 0}, {"color": "#RRGGBB", "stop": 100}]
+Return 3-6 color stops as a JSON array.
+Format: [{"color":"#RRGGBB","stop":0}, {"color":"#RRGGBB","stop":30}, {"color":"#RRGGBB","stop":100}]
 
 Rules:
-- Generate 2-4 color stops
-- "stop" is position: 0 = top, 100 = bottom
-- First stop must be 0, last must be 100
-- Middle stops (e.g., 30, 60) create richer transitions
+- First stop must be at 0, last must be at 100
+- Use uppercase hex colors only (#RRGGBB format)
+- Colors should blend smoothly and naturally
+- Create visual interest with contrast while maintaining harmony
+- Interpret any input creatively (emotions, places, objects, vibes, nonsense - everything gets a gradient)
 
-Interpretation guide:
-
-EMOTIONS → Translate feeling into color flow
-- Warm emotions (love, happy, hope) → warm colors flowing down, light to rich
-- Dark emotions (hate, anxiety, drowning) → heavy darks at top or bottom, saturated tones
-- Calm emotions → muted tones, gentle transitions, no harsh jumps
-
-PLACES → Capture the iconic color palette and atmosphere
-- Cities → their vibe (Mumbai = golden sun over ocean blue, LA = pink haze to deep purple)
-- Nature locations → sky-to-ground logic (mountains = pale sky to deep forest, desert = hot white to sand orange)
-- Countries → flag colors OR iconic landscape colors
-
-NATURE/WEATHER → Think like a sky or landscape
-- Time of day → sunrise/sunset warm at bottom rising to cool; night dark throughout
-- Weather → storms are heavy grays/blues; snow is soft whites with cool blue shadows
-- Seasons → summer is bright and warm; winter is cool and muted
-
-OBJECTS → Extract the essential color palette
-- Focus on 2-3 most recognizable colors
-- Arrange them in a way that feels natural (e.g., apple = deep red to bright red to green stem hint)
-
-AESTHETICS/VIBES → Match the era or style
-- "90s" → neon cyan, magenta, high contrast stops
-- "cottage core" → cream, dusty pink, sage green
-- "cyber" → dark base, neon accent, teal/magenta pops
-- "vaporwave" → pink, cyan, purple with distinct bands
-
-COLORS → Create depth, not flat swatches
-- "blue" → give it range (sky blue to deep navy, or navy to electric)
-- Single-color requests should still have 2-3 shades for richness
-
-ABSTRACT/POETIC → Interpret the imagery
-- "jasmine in rain" → soft white to pale green to misty gray-blue
-- "drowning fade" → light surface blue to deep dark ocean at bottom
-
-NONSENSE/GREETINGS → Default to something friendly
-- Warm, approachable colors
-- Gentle transitions
-- Nothing extreme
-
-Design principles:
-- Beautiful gradients have CONTRAST—avoid muddy middle tones
-- Think about gravity: light rises, darkness pools, heat radiates
-- Smooth transitions need space—don't cluster stops at 30, 35, 40
-- When in doubt: 3 stops at 0, 40-50, 100
-
-Return ONLY valid JSON array. No markdown, no explanation.
-Format: [{"color":"#RRGGBB","stop":number}, ...]`;
+Return ONLY the JSON array. No explanation, no markdown.`;
       }
 
       function radialSystemPrompt() {
-        return `You generate beautiful radial gradients that capture the essence, mood, and color palette of ANY concept.
+        return `Generate a radial gradient (center outward) that captures the vibe of the user's input.
 
-A radial gradient is a glow emanating from a focal point—like light, energy, or atmosphere. Your job is to translate ANY input into a visually stunning gradient.
+Return 3-6 color stops as a JSON array, from center to edge.
+Format: [{"color":"#RRGGBB","stop":0}, {"color":"#RRGGBB","stop":40}, {"color":"#RRGGBB","stop":100}]
 
-Output format:
-{
-  "centerColor": "#RRGGBB",      // focal point color
-  "outerColor": "#RRGGBB",       // edge/background color
-  "midColors": [{"color": "#RRGGBB", "position": 20-80}],  // optional, for richer gradients
-  "position": "center" | "top-center" | "bottom-center" | "top-left" | "top-right" | "bottom-left" | "bottom-right",
-  "size": "small" | "medium" | "large",
-  "softness": "sharp" | "soft" | "ultra-soft",
-  "shape": "circle" | "ellipse"
-}
+Rules:
+- First stop is the center (0), last is the outer edge (100)
+- Use uppercase hex colors only (#RRGGBB format)
+- Colors should blend smoothly and naturally
+- Create visual interest with contrast while maintaining harmony
+- Interpret any input creatively (emotions, places, objects, vibes, nonsense - everything gets a gradient)
 
-Interpretation guide:
-
-EMOTIONS → Translate feeling into color temperature, intensity, and softness
-- Warm emotions (love, happy, hope) → warm colors, soft edges, centered or rising
-- Dark emotions (hate, anxiety, drowning) → deep/saturated colors, can be sharp, darker edges
-- Calm emotions → muted tones, ultra-soft, gentle transitions
-
-PLACES → Capture the iconic color palette and atmosphere, not literal geography
-- Cities → their vibe (Mumbai = vibrant yellows + ocean blues, Dubai = gold + deep blue night)
-- Nature locations → dominant landscape colors (Yosemite = forest green + granite gray + sky)
-- Countries → can reference flag colors OR iconic landscapes
-
-NATURE/WEATHER → Atmospheric interpretation
-- Time of day → position the "light source" appropriately (sunset = bottom, morning = top-right)
-- Weather → snow is soft whites, storms are dark and sharp
-- Elements → fire rises (bottom-center), water pools (center or bottom)
-
-OBJECTS → Extract the essential color palette
-- Focus on 2-3 most recognizable colors
-- Consider the object's texture (soft blanket = soft gradient, sharp pencil = defined stops)
-
-AESTHETICS/VIBES → Match the era or style's color language
-- "90s" → neon, cyan, magenta, high contrast
-- "cottage core" → muted greens, dusty pinks, cream
-- "cyber" → dark bases, neon accents, teals and magentas
-
-COLORS → Create depth and richness, not flat swatches
-- "blue" shouldn't be just blue—give it depth (deep navy center fading to bright cyan, or vice versa)
-- Add subtle variations to make single-color requests interesting
-
-ABSTRACT/POETIC → Interpret the imagery and mood
-- "jasmine in rain" → soft whites, pale greens, gray-blue mist
-- "drowning fade" → deep ocean blues, darkness pulling down
-
-NONSENSE/GREETINGS → Default to something friendly and universally appealing
-- Warm, approachable colors
-- Soft gradients
-- Nothing too extreme
-
-QUESTIONS → Answer visually
-- "What does X look like" → your best interpretation of X's color essence
-
-Size and softness guidelines:
-- "small" + "sharp": intense, focused energy (neon signs, spotlights, concentrated emotions like anxiety)
-- "medium" + "soft": balanced, most versatile (most objects, places, general moods)
-- "large" + "ultra-soft": atmospheric, ambient (skies, weather, calm emotions, time of day)
-
-Don't default to large/ultra-soft. Match the intensity of the concept:
-- "fire" → small-medium, sharp-soft (concentrated heat)
-- "sunset" → large, ultra-soft (atmospheric)
-- "neon" → small, sharp (focused glow)
-- "ocean" → large, soft (expansive but with presence)
-- "anxiety" → medium, sharp (tight, uncomfortable)
-- "hope" → medium-large, soft (warm but not overwhelming)
-
-Design principles:
-- Beautiful gradients have CONTRAST—don't make everything muddy middle tones
-- Position matters: light sources should feel natural (suns rise/set, glows emanate from logical places)
-- When in doubt, go with "position": "center", "size": "medium", "softness": "soft"
-
-Return ONLY valid JSON. No markdown, no explanation.`;
+Return ONLY the JSON array. No explanation, no markdown.`;
       }
 
       function parseLinearResponse(content) {
@@ -743,7 +782,9 @@ Return ONLY valid JSON. No markdown, no explanation.`;
 
         const data = await res.json();
         let content = data.message?.content || data.content || '';
-        if (type === 'radial') return parseRadialResponse(content);
+        if (type === 'radial') {
+          return { stops: parseLinearResponse(content), position: 'center' };
+        }
         return { stops: parseLinearResponse(content), position: 'center' };
       }
 
@@ -758,6 +799,11 @@ Return ONLY valid JSON. No markdown, no explanation.`;
 
         if (shouldGenerate && !isGenerating && hasUserPrompt && prompt && hasCached) {
           applyCachedForType(prompt);
+          return;
+        }
+
+        if (!hasGenerated && !isGenerating) {
+          startLoadingAnimation();
           return;
         }
 
@@ -794,6 +840,7 @@ Return ONLY valid JSON. No markdown, no explanation.`;
       function applyCachedForType(prompt) {
         if (cachePrompt !== prompt) return;
         const previousStops = lastStops;
+        stopLoadingAnimation();
         if (currentType === 'radial' && cachedRadial && Array.isArray(cachedRadial.stops)) {
           lastStops = cachedRadial.stops;
           lastRadialPosition = cachedRadial.position || 'center';
@@ -803,6 +850,8 @@ Return ONLY valid JSON. No markdown, no explanation.`;
           return;
         }
         hasGenerated = true;
+        hasSavedCurrent = false;
+        currentSavedId = '';
         animatePreviewTransition(previousStops, lastStops, currentType);
         applyBtn.disabled = !hasSelection;
         updateApplyVisibility();
@@ -818,6 +867,8 @@ Return ONLY valid JSON. No markdown, no explanation.`;
         }
         cachePrompt = q;
         lastPrompt = q;
+        hasSavedCurrent = false;
+        currentSavedId = '';
         promptEl.blur();
         setStatus('');
         generateBtn.disabled = true;
@@ -842,22 +893,6 @@ Return ONLY valid JSON. No markdown, no explanation.`;
           } else {
             cachedLinearStops = result.stops;
           }
-          parent.postMessage(
-            {
-              pluginMessage: {
-                type: 'save-gradient',
-                gradient: {
-                  id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-                  createdAt: Date.now(),
-                  prompt: q,
-                  type: currentType,
-                  stops: result.stops,
-                  radialPosition: lastRadialPosition,
-                },
-              },
-            },
-            '*'
-          );
           stopLoadingAnimation();
           animatePreviewTransition(previousStops, result.stops, currentType);
           applyBtn.disabled = !hasSelection;
@@ -873,12 +908,49 @@ Return ONLY valid JSON. No markdown, no explanation.`;
       }
 
       generateBtn.onclick = handleGenerate;
-      // Only generate on explicit button click.
+      promptEl.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') handleGenerate();
+      });
 
       applyBtn.onclick = () => {
         if (!lastStops) return;
         promptEl.blur();
         applyGradientFromLast();
+      };
+
+      saveLibraryBtn.onclick = () => {
+        if (!lastStops || !hasGenerated || isGenerating) return;
+        const prompt = getEffectivePrompt();
+        if (hasSavedCurrent && currentSavedId) {
+          parent.postMessage(
+            { pluginMessage: { type: 'delete-gradient', id: currentSavedId } },
+            '*'
+          );
+          hasSavedCurrent = false;
+          currentSavedId = '';
+          updateApplyVisibility();
+          return;
+        }
+        const newId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        hasSavedCurrent = true;
+        currentSavedId = newId;
+        updateApplyVisibility();
+        parent.postMessage(
+          {
+            pluginMessage: {
+              type: 'save-gradient',
+              gradient: {
+                id: newId,
+                createdAt: Date.now(),
+                prompt,
+                type: currentType,
+                stops: lastStops,
+                radialPosition: lastRadialPosition,
+              },
+            },
+          },
+          '*'
+        );
       };
 
       window.onmessage = (event) => {
@@ -892,15 +964,29 @@ Return ONLY valid JSON. No markdown, no explanation.`;
         }
         if (msg.type === 'saved-gradients') {
           savedGradients = Array.isArray(msg.gradients) ? msg.gradients : [];
+          if (hasSavedCurrent && currentSavedId) {
+            const stillSaved = savedGradients.some((g) => g && g.id === currentSavedId);
+            if (!stillSaved) {
+              hasSavedCurrent = false;
+              currentSavedId = '';
+              updateApplyVisibility();
+            }
+          }
           renderLibrary();
         }
       };
 
       tabGenerate.addEventListener('click', () => setActiveTab('generate'));
       tabLibrary.addEventListener('click', () => setActiveTab('library'));
+      saveLibraryBtn.addEventListener('mouseenter', () => {
+        if (hasSavedCurrent) saveLibraryBtn.textContent = 'Delete';
+      });
+      saveLibraryBtn.addEventListener('mouseleave', () => {
+        saveLibraryBtn.textContent = hasSavedCurrent ? 'Saved' : 'Save to library';
+      });
 
-      promptEl.placeholder = 'Deep dark forest';
-      preview.style.background = toCssGradient(DEFAULT_STOPS, currentType);
+      promptEl.placeholder = 'Create a gradient for any vibe';
+      startLoadingAnimation();
       updateApplyVisibility();
       parent.postMessage({ pluginMessage: { type: 'load-gradients' } }, '*');
     </script>
